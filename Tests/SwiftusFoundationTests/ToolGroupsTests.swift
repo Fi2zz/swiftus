@@ -38,7 +38,7 @@ struct ToolGroupsTests {
         try registry.register(DangerTool())
         registry.guardRisk(.low)
         let denied = await registry.call(ToolCall(name: "danger"))
-        #expect(denied.error?.code == .toolDenied)
+        #expect(denied.error?.code == ToolError.Codes.toolDenied)
         #expect(denied.content == "工具 \"danger\" 风险等级 high 高于允许的 low")
 
         let allowed = await registry.call(ToolCall(name: "echo", arguments: ["text": .string("x")]))

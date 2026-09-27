@@ -18,21 +18,22 @@ public struct ToolCall: Sendable, Equatable {
     }
 }
 
-/// 工具失败的结构化信息。
+/// 工具失败的结构化信息；code 为开放字符串（工具可产出自定义失败码，
+/// 注册表自身的失败码全集见 Codes，规格 S5 §6）。
 public struct ToolError: Sendable, Equatable {
-    /// 失败码全集（规格 S5 §6）。
-    public enum Code: String, Sendable {
-        case invalidArgs = "INVALID_ARGS"
-        case toolTimeout = "TOOL_TIMEOUT"
-        case unknownTool = "UNKNOWN_TOOL"
-        case toolDenied = "TOOL_DENIED"
-        case toolError = "TOOL_ERROR"
+    /// 注册表自身的失败码全集。
+    public enum Codes {
+        public static let invalidArgs = "INVALID_ARGS"
+        public static let toolTimeout = "TOOL_TIMEOUT"
+        public static let unknownTool = "UNKNOWN_TOOL"
+        public static let toolDenied = "TOOL_DENIED"
+        public static let toolError = "TOOL_ERROR"
     }
 
-    public let code: Code
+    public let code: String
     public let message: String
 
-    public init(_ code: Code, _ message: String) {
+    public init(_ code: String, _ message: String) {
         self.code = code
         self.message = message
     }
@@ -40,7 +41,7 @@ public struct ToolError: Sendable, Equatable {
 
 extension ToolError: CustomStringConvertible {
     public var description: String {
-        "\(code.rawValue): \(message)"
+        "\(code): \(message)"
     }
 }
 

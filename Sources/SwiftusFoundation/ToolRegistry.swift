@@ -117,18 +117,18 @@ public final class ToolRegistry {
         guard let tool = tools[call.name] else {
             return .failure(
                 "未知工具 \"\(call.name)\"",
-                error: ToolError(.unknownTool, "unknown tool \"\(call.name)\"")
+                error: ToolError(ToolError.Codes.unknownTool, "unknown tool \"\(call.name)\"")
             )
         }
         let violations = validateToolArgs(tool, call.arguments)
         guard violations.isEmpty else {
             return .failure(
                 "参数不合法：\(violations.joined(separator: "；"))",
-                error: ToolError(.invalidArgs, violations.joined(separator: "; "))
+                error: ToolError(ToolError.Codes.invalidArgs, violations.joined(separator: "; "))
             )
         }
         if let denial = firstDenial(call) {
-            return .failure(denial, error: ToolError(.toolDenied, denial))
+            return .failure(denial, error: ToolError(ToolError.Codes.toolDenied, denial))
         }
         let effective = timeout ?? tool.timeout ?? defaultTimeout
         do {
@@ -136,7 +136,7 @@ public final class ToolRegistry {
                 try await self.chain(tool, call: call)()
             }
         } catch {
-            return .failure("\(error)", error: ToolError(.toolError, "\(error)"))
+            return .failure("\(error)", error: ToolError(ToolError.Codes.toolError, "\(error)"))
         }
     }
 
@@ -189,7 +189,7 @@ public final class ToolRegistry {
                 race.cancel()
                 complete(.success(ToolResult.failure(
                     "工具 \"\(call.name)\" 超时（\(Int(timeout * 1000))ms）",
-                    error: ToolError(.toolTimeout, "\(call.name) timed out")
+                    error: ToolError(ToolError.Codes.toolTimeout, "\(call.name) timed out")
                 )))
             }
         }

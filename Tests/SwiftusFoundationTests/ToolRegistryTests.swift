@@ -76,13 +76,13 @@ struct ToolRegistryTests {
         let registry = ToolRegistry()
         let unknown = await registry.call(ToolCall(name: "ghost"))
         #expect(unknown.failed)
-        #expect(unknown.error?.code == .unknownTool)
+        #expect(unknown.error?.code == ToolError.Codes.unknownTool)
         #expect(unknown.content == "未知工具 \"ghost\"")
 
         let registry2 = ToolRegistry()
         try? registry2.register(EchoTool())
         let invalid = await registry2.call(ToolCall(name: "echo", arguments: ["text": .int(1)]))
-        #expect(invalid.error?.code == .invalidArgs)
+        #expect(invalid.error?.code == ToolError.Codes.invalidArgs)
         #expect(invalid.content.hasPrefix("参数不合法："))
     }
 
@@ -95,11 +95,11 @@ struct ToolRegistryTests {
             call.name == "echo" ? "echo 被拒绝" : nil
         }
         let denied = await registry.call(ToolCall(name: "echo", arguments: ["text": .string("x")]))
-        #expect(denied.error?.code == .toolDenied)
+        #expect(denied.error?.code == ToolError.Codes.toolDenied)
         #expect(denied.content == "echo 被拒绝")
 
         let crashed = await registry.call(ToolCall(name: "crash"))
-        #expect(crashed.error?.code == .toolError)
+        #expect(crashed.error?.code == ToolError.Codes.toolError)
         #expect(crashed.content.contains("炸了"))
     }
 
@@ -129,18 +129,18 @@ struct ToolRegistryTests {
         let registry = ToolRegistry(defaultTimeout: 10)
         try registry.register(SlowTool())
         let timedOut = await registry.call(ToolCall(name: "slow"), timeout: 0.05)
-        #expect(timedOut.error?.code == .toolTimeout)
+        #expect(timedOut.error?.code == ToolError.Codes.toolTimeout)
         #expect(timedOut.content == "工具 \"slow\" 超时（50ms）")
 
         let registry2 = ToolRegistry()
         try registry2.register(SlowTool(timeout: 0.05))
         let toolTimedOut = await registry2.call(ToolCall(name: "slow"))
-        #expect(toolTimedOut.error?.code == .toolTimeout)
+        #expect(toolTimedOut.error?.code == ToolError.Codes.toolTimeout)
 
         let registry3 = ToolRegistry(defaultTimeout: 0.05)
         try registry3.register(SlowTool())
         let defaultTimedOut = await registry3.call(ToolCall(name: "slow"))
-        #expect(defaultTimedOut.error?.code == .toolTimeout)
+        #expect(defaultTimedOut.error?.code == ToolError.Codes.toolTimeout)
     }
 
     @Test("onResult 广播结局;onChange 在注册与注销后触发")

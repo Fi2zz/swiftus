@@ -111,14 +111,14 @@ public final class Context {
 
     /// 执行 body；返回值为 Disposer 时自动登记。
     @discardableResult
-    public func effect(_ body: @ContextTreeActor () -> Disposer) -> Disposer {
-        scope.capture(body)
+    public func effect(_ body: @ContextTreeActor () throws -> Disposer) rethrows -> Disposer {
+        try scope.capture(body)
     }
 
     /// 执行 body，原样返回其结果（不登记）。
     @discardableResult
-    public func effect<T>(_ body: @ContextTreeActor () -> T) -> T {
-        scope.capture(body)
+    public func effect<T>(_ body: @ContextTreeActor () throws -> T) rethrows -> T {
+        try scope.capture(body)
     }
 
     // ══════════════════════════════════════════════════════════════

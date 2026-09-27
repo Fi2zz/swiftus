@@ -27,16 +27,16 @@ public final class EffectScope {
 
     /// 执行 body；返回值为 Disposer 时自动登记。
     @discardableResult
-    public func capture(_ body: @ContextTreeActor () -> Disposer) -> Disposer {
-        let disposer = body()
+    public func capture(_ body: @ContextTreeActor () throws -> Disposer) rethrows -> Disposer {
+        let disposer = try body()
         track(disposer)
         return disposer
     }
 
     /// 执行 body，原样返回其结果（不登记）。
     @discardableResult
-    public func capture<T>(_ body: @ContextTreeActor () -> T) -> T {
-        body()
+    public func capture<T>(_ body: @ContextTreeActor () throws -> T) rethrows -> T {
+        try body()
     }
 
     /// 按 LIFO 顺序执行全部撤销函数；单个错误不阻断其余，收集后返回（空数组 = 全部成功）。幂等。
