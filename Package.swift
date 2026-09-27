@@ -18,6 +18,7 @@ let package = Package(
         .library(name: "SwiftusCron", targets: ["SwiftusCron"]),
         .library(name: "SwiftusAgent", targets: ["SwiftusAgent"]),
         .library(name: "SwiftusTasks", targets: ["SwiftusTasks"]),
+        .executable(name: "swiftus-demo", targets: ["SwiftusRunner"]),
     ],
     dependencies: [
         .package(url: "https://github.com/jpsim/Yams.git", from: "5.0.0"),
@@ -43,10 +44,15 @@ let package = Package(
             "SwiftusCompaction", "SwiftusSearch", "SwiftusSkill", "SwiftusMCP",
             "SwiftusSchedule", "SwiftusCron", "SwiftusAgent", "SwiftusTasks",
         ]),
+        .target(name: "SwiftusDemo", dependencies: [
+            "SwiftusCore", "SwiftusFoundation", "SwiftusLLM", "SwiftusSkill",
+        ]),
+        .executableTarget(name: "SwiftusRunner", dependencies: ["SwiftusDemo"]),
         .testTarget(name: "SwiftusCoreTests", dependencies: ["SwiftusCore"]),
         .testTarget(name: "SwiftusCredentialsTests", dependencies: ["SwiftusCredentials"]),
         .testTarget(name: "SwiftusLLMTests", dependencies: ["SwiftusLLM", "SwiftusCredentials"]),
         .testTarget(name: "SwiftusFoundationTests", dependencies: ["SwiftusFoundation"]),
         .testTarget(name: "SwiftusSkillTests", dependencies: ["SwiftusSkill", "SwiftusFoundation"]),
+        .testTarget(name: "SwiftusDemoTests", dependencies: ["SwiftusDemo"]),
     ]
 )

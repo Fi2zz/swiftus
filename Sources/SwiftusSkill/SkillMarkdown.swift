@@ -92,13 +92,13 @@ private enum YamlOutcome {
 
 /// YAML 解析;非法 YAML 与非键值映射分开回报(规格 S14 §2 的两条不同文案)。
 private func loadYamlMapping(_ source: String) -> YamlOutcome {
-    let parsed: Any
+    let parsed: Any?
     do {
         parsed = try Yams.load(yaml: source)
     } catch {
         return .invalid("frontmatter 不是合法 YAML：\(error)")
     }
-    guard let dict = parsed as? [String: Any] else { return .notMapping }
+    guard let loaded = parsed, let dict = loaded as? [String: Any] else { return .notMapping }
     return .mapping(dict.mapValues { JSONValue(bridged: $0) ?? .null })
 }
 

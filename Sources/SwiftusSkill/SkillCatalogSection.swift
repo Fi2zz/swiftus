@@ -42,10 +42,12 @@ public final class SkillCatalogSection {
 
     /// 开始跟随注册表；返回撤销函数（幂等）。
     /// name 是挂到 prompt 上的段名：同一份 prompt 上挂多个作用域时各用不同的段名。
+    ///
+    /// 生命周期与 Dart 一致：注册表的监听强引用本控制器，直到 detach 或注册表释放。
     @discardableResult
     public func attach(name: String = kSkillCatalogSectionName) -> Disposer {
         self.name = name
-        listenerToken = registry.onChange { [weak self] in self?.sync() }
+        listenerToken = registry.onChange { [self] in sync() }
         sync()
         var disposed = false
         return { [weak self] in

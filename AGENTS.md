@@ -6,7 +6,7 @@
 
 **swiftus** 是 [conatus](https://github.com/Fi2zz/conatus)（Dart 实现的「时空可组合性」编程范式框架：可逆效应 + 反应式共效应）的 Swift 移植版，命名延续 cordis（TS）→ conatus（Dart）→ swiftus（Swift）的拉丁谱系。移植动机是摆脱 Dart 运行时单一依赖，使框架成为语言中立的资产。
 
-**当前状态（2026-09-27）**：W1 进行中。已完成实质移植：**SwiftusCore**（规格 S1/S2 + S3 脱敏节）、**SwiftusCredentials 最小集**（规格 S12）、**SwiftusLLM**（规格 S10）、**SwiftusFoundation prompt/tool 子集**（规格 S5/S6）、**SwiftusSkill**（规格 S14，目录监听暂缓）；swift-testing 116 例 24 套件 debug+release 双绿。其余 target 仍为空占位。外部依赖：Yams（仅 SwiftusSkill frontmatter）。平台 floor macOS 13 / iOS 16（§5.6 抬升）。没有 CI。
+**当前状态（2026-09-27）**：**W1「能跑起来」已收口**——core / credentials 最小集 / llm / prompt / tool / skill 全部就位，离线 Demo `swift run swiftus-demo` 跑通「提问 → 工具调用 → 回填 → 收口」（脚本化模型，无需 Key），swift-testing 118 例 25 套件 debug+release 双绿、release 零警告。外部依赖：Yams（仅 SwiftusSkill）。平台 floor macOS 13 / iOS 16（§5.6 抬升）。没有 CI。下一步 W2：Compaction + Schedule + Agent + Tasks。
 
 移植范围（已拍板）：
 
