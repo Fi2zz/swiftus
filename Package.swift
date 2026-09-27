@@ -3,6 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "swiftus",
+    platforms: [.macOS(.v13), .iOS(.v16)],
     products: [
         .library(name: "Swiftus", targets: ["Swiftus"]),
         .library(name: "SwiftusCore", targets: ["SwiftusCore"]),
@@ -37,5 +38,7 @@ let package = Package(
             "SwiftusSchedule", "SwiftusCron", "SwiftusAgent", "SwiftusTasks",
         ]),
         .testTarget(name: "SwiftusCoreTests", dependencies: ["SwiftusCore"]),
+        .testTarget(name: "SwiftusCredentialsTests", dependencies: ["SwiftusCredentials"]),
+        .testTarget(name: "SwiftusLLMTests", dependencies: ["SwiftusLLM", "SwiftusCredentials"]),
     ]
 )

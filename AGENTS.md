@@ -6,7 +6,7 @@
 
 **swiftus** 是 [conatus](https://github.com/Fi2zz/conatus)（Dart 实现的「时空可组合性」编程范式框架：可逆效应 + 反应式共效应）的 Swift 移植版，命名延续 cordis（TS）→ conatus（Dart）→ swiftus（Swift）的拉丁谱系。移植动机是摆脱 Dart 运行时单一依赖，使框架成为语言中立的资产。
 
-**当前状态（2026-09-27）**：W1 进行中。13 个 library target 骨架就位；**SwiftusCore 已完成实质移植**（Context / EffectScope / Reactor / ServiceKey / JSONValue / Redaction，规格 S1/S2 + S3 脱敏节，swift-testing 25 例 debug+release 双绿），其余 target 仍为空占位。没有外部依赖、没有 CI。
+**当前状态（2026-09-27）**：W1 进行中。已完成实质移植：**SwiftusCore**（Context / EffectScope / Reactor / ServiceKey / JSONValue / Redaction，规格 S1/S2 + S3 脱敏节）、**SwiftusCredentials 最小集**（快照 / env / memory，规格 S12）、**SwiftusLLM**（chat / responses 双形态 wire 层、FallbackLlm、SSE 字节级解析，规格 S10）；swift-testing 57 例 11 套件 debug+release 双绿。其余 target 仍为空占位。平台 floor macOS 13 / iOS 16（§5.6 抬升）。没有外部依赖、没有 CI。
 
 移植范围（已拍板）：
 
@@ -24,7 +24,7 @@
 
 - 语言/工具链：Swift 6（`swift-tools-version: 6.0`，当前实测 Swift 6.3.3），**Swift 6 strict concurrency** 语境下开发；
 - 包管理：Swift Package Manager 单仓库多 target，无 `Package.resolved`（尚未引入外部依赖）；
-- 平台：`Package.swift` **不声明显式 platforms floor**，跟随工具链默认最低部署版本（若某 API 需要更高 floor，单独抬升并回写方案书 §5.6）；
+- 平台：`Package.swift` 声明 **macOS 13 / iOS 16** floor（2026-09-27 抬升：并发 API / AsyncBytes / Clock 突破工具链默认值，详见方案书 §5.6）；
 - 许可证：MIT。
 
 常用命令：
