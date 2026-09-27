@@ -40,5 +40,6 @@ let package = Package(
         .testTarget(name: "SwiftusCoreTests", dependencies: ["SwiftusCore"]),
         .testTarget(name: "SwiftusCredentialsTests", dependencies: ["SwiftusCredentials"]),
         .testTarget(name: "SwiftusLLMTests", dependencies: ["SwiftusLLM", "SwiftusCredentials"]),
+        .testTarget(name: "SwiftusFoundationTests", dependencies: ["SwiftusFoundation"]),
     ]
 )

@@ -38,6 +38,20 @@ extension JSONValue {
         guard case let .int(number) = self else { return nil }
         return Int(number)
     }
+
+    // REASON: 形态名映射为静态映射表例外（全局 AGENTS.md §6）。
+    /// 形态名（用于类型不符消息）：string / integer / number / boolean / object / array / null。
+    public var shapeName: String {
+        switch self {
+        case .object: return "object"
+        case .array: return "array"
+        case .string: return "string"
+        case .int: return "integer"
+        case .double: return "number"
+        case .bool: return "boolean"
+        case .null: return "null"
+        }
+    }
 }
 
 extension JSONValue {
