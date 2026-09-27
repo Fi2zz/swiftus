@@ -36,5 +36,6 @@ let package = Package(
             "SwiftusCompaction", "SwiftusSearch", "SwiftusSkill", "SwiftusMCP",
             "SwiftusSchedule", "SwiftusCron", "SwiftusAgent", "SwiftusTasks",
         ]),
+        .testTarget(name: "SwiftusCoreTests", dependencies: ["SwiftusCore"]),
     ]
 )

@@ -6,7 +6,7 @@
 
 **swiftus** 是 [conatus](https://github.com/Fi2zz/conatus)（Dart 实现的「时空可组合性」编程范式框架：可逆效应 + 反应式共效应）的 Swift 移植版，命名延续 cordis（TS）→ conatus（Dart）→ swiftus（Swift）的拉丁谱系。移植动机是摆脱 Dart 运行时单一依赖，使框架成为语言中立的资产。
 
-**当前状态（2026-09-27）**：仓库骨架阶段。13 个 library target 已全部建好并通过编译，但除伞包 `Swiftus`（仅 `@_exported import` 再导出其余 12 个 target）外，所有 target 源码均为空文件。**尚未开始任何实质移植，没有测试目录、没有外部依赖、没有 CI。**
+**当前状态（2026-09-27）**：W1 进行中。13 个 library target 骨架就位；**SwiftusCore 已完成实质移植**（Context / EffectScope / Reactor / ServiceKey / JSONValue / Redaction，规格 S1/S2 + S3 脱敏节，swift-testing 25 例 debug+release 双绿），其余 target 仍为空占位。没有外部依赖、没有 CI。
 
 移植范围（已拍板）：
 
@@ -95,7 +95,7 @@ docs/.handoffs/             # 两份权威文档（中文，移植的全部决�
 
 规格沉淀为**滚动式**：每个领域动工前，该领域对应规格文档与 fixtures 必须就绪。规格共 15 条（S1–S15），要点见方案书 §3.1，包括：S1 效应语义（LIFO 撤销/幂等/迟到登记/重入收敛 maxRounds=100/循环依赖检测）、S2 上下文树、S3/S4 Session 事件 JSONL 格式与 fork/replay、S5 工具管线（schema 白名单投影、失败码全集、超时优先级）、S6 Prompt 装配、S7 压缩切点、S8 调度语义（DST 缺口拒绝、重叠取较早）、S9 Cron 语义、S10 LLM 协议、S11 MCP 客户端、S12 凭据、S13 Memory 召回（中文二元组打分）、S14 Skill catalog、S15 SigV4 官方测试向量。
 
-- 规格文档与 fixtures 均放本仓 `spec/` 目录（规格 `spec/*.md`、用例 `spec/fixtures/`）——**当前尚未创建**；
+- 规格文档与 fixtures 均放本仓 `spec/` 目录（规格 `spec/*.md`、用例 `spec/fixtures/`）——S1 效应语义 / S2 上下文树已就绪，S3 仅脱敏一节（2026-09-27），其余随领域滚动补；fixtures 目录尚未创建；
 - fixtures 由 Dart 脚本导出器（放本仓 `tool/` 下，亦未创建）在本地 conatus checkout 上导出并校验，**fixtures 以 Dart 侧行为为准绳导出，不是手写**；
 - 每条规格至少 3 个用例；发现语义漏译时补一条 fixture 而非补丁代码。
 
