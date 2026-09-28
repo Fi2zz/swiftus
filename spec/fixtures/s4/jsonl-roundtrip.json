@@ -1,0 +1,98 @@
+{
+  "name": "jsonl-roundtrip",
+  "kind": "jsonl-roundtrip",
+  "events": [
+    {
+      "seq": 0,
+      "type": "user/message",
+      "time": "2026-08-06T12:00:00.000Z",
+      "data": {
+        "text": "查一下",
+        "api_key": "sk-1...cdef"
+      },
+      "id": "evt-1",
+      "sessionId": "s1"
+    },
+    {
+      "seq": 1,
+      "type": "assistant/message",
+      "time": "2026-08-06T12:01:00.000Z",
+      "data": {
+        "text": "",
+        "toolCalls": [
+          {
+            "id": "c1",
+            "name": "search",
+            "arguments": "{}"
+          }
+        ]
+      },
+      "id": "evt-2",
+      "sessionId": "s1"
+    },
+    {
+      "seq": 2,
+      "type": "tool/result",
+      "time": "2026-08-06T12:02:00.000Z",
+      "data": {
+        "callId": "c1",
+        "content": "结果"
+      },
+      "id": "evt-3",
+      "sessionId": "s1",
+      "parentEventId": "evt-2"
+    }
+  ],
+  "expect": {
+    "lines": [
+      "{\"seq\":0,\"type\":\"user/message\",\"time\":\"2026-08-06T12:00:00.000Z\",\"data\":{\"text\":\"查一下\",\"api_key\":\"sk-1...cdef\"},\"id\":\"evt-1\",\"sessionId\":\"s1\"}",
+      "{\"seq\":1,\"type\":\"assistant/message\",\"time\":\"2026-08-06T12:01:00.000Z\",\"data\":{\"text\":\"\",\"toolCalls\":[{\"id\":\"c1\",\"name\":\"search\",\"arguments\":\"{}\"}]},\"id\":\"evt-2\",\"sessionId\":\"s1\"}",
+      "{\"seq\":2,\"type\":\"tool/result\",\"time\":\"2026-08-06T12:02:00.000Z\",\"data\":{\"callId\":\"c1\",\"content\":\"结果\"},\"id\":\"evt-3\",\"sessionId\":\"s1\",\"parentEventId\":\"evt-2\"}"
+    ],
+    "loaded": [
+      {
+        "seq": 0,
+        "type": "user/message",
+        "time": "2026-08-06T12:00:00.000Z",
+        "data": {
+          "text": "查一下",
+          "api_key": "sk-1...cdef"
+        },
+        "id": "evt-1",
+        "sessionId": "s1"
+      },
+      {
+        "seq": 1,
+        "type": "assistant/message",
+        "time": "2026-08-06T12:01:00.000Z",
+        "data": {
+          "text": "",
+          "toolCalls": [
+            {
+              "id": "c1",
+              "name": "search",
+              "arguments": "{}"
+            }
+          ]
+        },
+        "id": "evt-2",
+        "sessionId": "s1"
+      },
+      {
+        "seq": 2,
+        "type": "tool/result",
+        "time": "2026-08-06T12:02:00.000Z",
+        "data": {
+          "callId": "c1",
+          "content": "结果"
+        },
+        "id": "evt-3",
+        "sessionId": "s1",
+        "parentEventId": "evt-2"
+      }
+    ],
+    "list": [
+      "s1"
+    ]
+  }
+}

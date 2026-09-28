@@ -1,0 +1,35 @@
+{
+  "name": "store-flow",
+  "kind": "store-flow",
+  "expect": {
+    "linesAfterFlush": 2,
+    "reopenedSeqs": [
+      0,
+      1,
+      2
+    ],
+    "reopenedTypes": [
+      "user/message",
+      "assistant/message",
+      "user/message"
+    ],
+    "forkLines": 3,
+    "forkedSeqs": [
+      0,
+      1,
+      2
+    ],
+    "forkedIds": [
+      "evt-a",
+      "evt-b",
+      "evt-c"
+    ],
+    "persistedIds": [
+      "s1",
+      "s1-fork-1"
+    ],
+    "afterRemove": [
+      "s1-fork-1"
+    ]
+  }
+}

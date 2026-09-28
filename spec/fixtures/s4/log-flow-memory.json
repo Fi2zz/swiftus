@@ -1,0 +1,43 @@
+{
+  "name": "log-flow-memory",
+  "kind": "log-flow",
+  "backend": "memory",
+  "expect": {
+    "appendedSeqs": [
+      0,
+      1,
+      2
+    ],
+    "forkedId": "s1-fork-1",
+    "forkedEvents": [
+      {
+        "seq": 0,
+        "type": "e0",
+        "time": "2026-08-06T12:00:00.000Z",
+        "id": "evt-0",
+        "sessionId": "s1-fork-1"
+      },
+      {
+        "seq": 1,
+        "type": "e1",
+        "time": "2026-08-06T12:01:00.000Z",
+        "id": "evt-1",
+        "sessionId": "s1-fork-1"
+      }
+    ],
+    "readFromT1": [
+      "e1",
+      "e2"
+    ],
+    "replayedTypes": [
+      "e0",
+      "e1",
+      "e2"
+    ],
+    "list": [
+      "s1",
+      "s1-fork-1",
+      "s2"
+    ]
+  }
+}
