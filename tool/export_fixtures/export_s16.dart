@@ -26,6 +26,7 @@ Future<void> main() async {
     'approval-flow': _approvalFlow,
     'sub-agent': _subAgent,
     'recovery': _recovery,
+    'skill': _skill,
   };
   const JsonEncoder encoder = JsonEncoder.withIndent('  ');
   for (final MapEntry<String, Future<Map<String, Object?>> Function()> entry
@@ -799,3 +800,119 @@ class _PreapproveAll extends Approval {
     return false;
   }
 }
+
+// ═══════════════════════ v1.3 增补：skill 沉淀 ═══════════════════════
+
+/// skill：命名规范化 / 元信息解析 / 占位符注入 / 提取沉淀与审批/安全边界 /
+/// 记忆持久化恢复。
+Future<Map<String, Object?>> _skill() async {
+  final List<Map<String, Object?>> nameCases = <Map<String, Object?>>[
+    <String, Object?>{
+      'input': 'Foo Bar!',
+      'expect': skillNameFrom('Foo Bar!'),
+    },
+    <String, Object?>{
+      'input': '___',
+      'expect': skillNameFrom('___'),
+    },
+    <String, Object?>{
+      'input': ' 你好 World ',
+      'expect': skillNameFrom(' 你好 World '),
+    },
+  ];
+
+  final List<Map<String, Object?>> metaCases = <Map<String, Object?>>[
+    <String, Object?>{
+      'label': 'JSON 命中',
+      'input': '{"name":"SearchWeb","description":"搜索网络"}',
+      'tools': <String>['search'],
+      'expect': await _metaJson(parseSkillMeta('{"name":"SearchWeb","description":"搜索网络"}', <String>['search'])),
+    },
+    <String, Object?>{
+      'label': 'name 缺失回退确定性',
+      'input': '只有描述',
+      'tools': <String>['a', 'b'],
+      'expect': await _metaJson(parseSkillMeta('只有描述', <String>['a', 'b'])),
+    },
+  ];
+
+  // 占位符注入端到端。
+  final ToolRegistry placeholderTools = ToolRegistry()..register(_EchoTool());
+  final SkillTool skill = SkillTool(
+    name: 'greet',
+    description: '问候',
+    steps: <SkillStep>[
+      SkillStep(toolName: 'echo', arguments: <String, Object?>{'text': '你好 {{name}}！'}),
+      SkillStep(toolName: 'echo', arguments: <String, Object?>{'text': '再见 {{name}}'}),
+    ],
+    tools: placeholderTools,
+  );
+  final ToolResult skillResult = await skill.call(ToolContext(ToolCall(
+    name: 'greet',
+    arguments: <String, Object?>{'name': '小明'},
+  )));
+
+  // 提取沉淀：同序列 3 次 → 注册；high 风险不沉淀；审批拒绝不沉淀。
+  final SkillLibrary library = SkillLibrary(threshold: 3);
+  for (int i = 0; i < 3; i++) {
+    library.recordTools('任务$i', <String>['echo']);
+  }
+  final ToolRegistry extractTools = ToolRegistry()..register(_EchoTool());
+  final SkillTool? extracted = await library.maybeExtract(tools: extractTools);
+
+  final SkillLibrary safeLibrary = SkillLibrary(threshold: 1);
+  safeLibrary.recordTools('高危', <String>['risky']);
+  final ToolRegistry safeTools = ToolRegistry()
+    ..register(_EchoTool())
+    ..register(_GatedTool('risky', ToolRisk.high));
+  final SkillTool? notExtracted = await safeLibrary.maybeExtract(tools: safeTools);
+
+  final SkillLibrary deniedLibrary = SkillLibrary(threshold: 1, approval: AutoApproval(false));
+  deniedLibrary.recordTools('审批拒绝', <String>['echo']);
+  final ToolRegistry deniedTools = ToolRegistry()..register(_EchoTool());
+  final SkillTool? denied = await deniedLibrary.maybeExtract(tools: deniedTools);
+
+  // 记忆持久化 + 恢复。
+  final MemoryStore memory = MemoryStore();
+  final SkillLibrary persistedLibrary = SkillLibrary(threshold: 1, memory: memory);
+  persistedLibrary.recordTools('记忆', <String>['echo']);
+  final ToolRegistry persistTools = ToolRegistry()..register(_EchoTool());
+  await persistedLibrary.maybeExtract(tools: persistTools);
+  final ToolRegistry freshTools = ToolRegistry()..register(_EchoTool());
+  final int restored = await persistedLibrary.restore(tools: freshTools);
+
+  return <String, Object?>{
+    'name': 'skill',
+    'kind': 'skill',
+    'nameCases': nameCases,
+    'metaCases': metaCases,
+    'expect': <String, Object?>{
+      'skillParams': <String>[for (final ParamSpec p in skill.params) p.name],
+      'skillResultContent': skillResult.content,
+      'skillResultValue': skillResult.value,
+      'extractedName': extracted?.name,
+      'extractedRegistered': extractTools.get(extracted?.name ?? '') != null,
+      'highRiskNotExtracted': notExtracted == null,
+      'deniedNotExtracted': denied == null,
+      'restored': restored,
+      'restoredRegistered': freshTools.get('skill_echo') != null,
+    },
+  };
+}
+
+/// 回显工具。
+class _EchoTool extends Tool {
+  @override
+  String get name => 'echo';
+  @override
+  String get description => '回显';
+  @override
+  Future<ToolResult> call(ToolContext ctx) async {
+    final String text = '${ctx.arguments['text'] ?? ''}';
+    return ToolResult.success(text, value: text);
+  }
+}
+
+
+Map<String, Object?> _metaJson(SkillMeta meta) =>
+    <String, Object?>{'name': meta.name, 'description': meta.description};

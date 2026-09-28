@@ -159,6 +159,24 @@ Agent Loop 里替模型跑一次「只允许 plan_write」的规划轮：
 - `RecoveryService`：`snapshot(session)`（建议每轮结束或会话释放调用）/ `load(id)`（不存在或版本不符抛 `RecoveryException('not-found' | 'unsupported-version')`）/ `restore(id)`（由快照重建带事件种子的会话，可直接交给 Agent Loop 继续对话）/ list / delete；
 - `provideRecovery`：存储优先级 store > 'database' 服务（DatabaseSnapshotStore，W3 后补）> 内存实现。
 
+### 6.5 skill 沉淀（v1.3 增补；记忆前置见 S13）
+
+- `SkillStep`：`{toolName, arguments}`（字符串值里的 `{{name}}` 会被技能入参替换）；
+- `SkillTool(name, description, steps, tools, params?)`（风险 medium）：按序执行各步（参数先经 `resolveSkillArg` 用 `{{name}}` 占位符替换）；任一步失败返回 `技能 "<name>" 在步骤 <tool> 失败：<content>`（error 透传）；成功 content 为**最后一步**的结果、规范值为全部输出列表；`deriveSkillParams` 从占位符派生必填字符串参数（去重，正则 `\{\{(\w+)\}\}`）；`toJson`/`fromJson` 持久化；
+- `skill_namer`：`skillNameFrom(text)`（转小写、非 `[a-z0-9]` 替换为 `_`、剥首尾 `_`，空则 `skill`）；`deterministicSkillNamer`（名 `skill_<工具序列下划线连接>`、描述 `自动沉淀的技能：依次调用 <顿号连接>。`）；`llmSkillNamer(llm, options?)`（提示词只回 JSON，解析失败回退确定性）；`parseSkillMeta`（正则 `"name"\s*:\s*"([^"]+)"` / `"description"\s*:\s*"([^"]*)"` 大小写不敏感，name 缺失回退）；
+- `SkillLibrary(threshold = 3, namer?, approval?, memory?)`（threshold < 1 快速失败）：
+  - `record(task, steps)`（空步骤忽略）/ `recordTools(task, tools)`；
+  - `maybeExtract(tools, namer?)`：取首条达到阈值的**未提取过**的签名轨迹（签名 = 工具名 `>` 连接）；标记已提取；`_isSafe`（任一步工具未注册或 risk == high 则不沉淀）；命名（显式 > 库 > 确定性）→ 构造 SkillTool → 有 approval 先 `request`（toolName `skill:<name>`，id `skill-<微秒>`）不批则返回 null → 未注册则注册 → 入库 → `_persist`（memory 非空时 `remember(jsonEncode(skill.toJson()), tags: {skill})`）→ 返回技能；
+  - `restore(tools, memory?)`：从记忆库带 `skill` 标签的条目反序列化注册（损坏条目跳过；空名或已注册跳过）；返回恢复数；
+  - `skills` / `traceCount`；
+- `toolNamesFromEvents(events)`：从 `tool/result` 事件提取工具名序列（data 非对象给空串）；
+- `provideSkillLibrary(ctx, library?, llm?, tools?, memory?, approval?, threshold = 3, namer?)`：服务键 `skill`；命名器优先显式 → llm（或上下文 llm）装配 llmSkillNamer → 确定性；审批/记忆缺省取上下文。
+
+### 6.6 AgentLoop 记忆接入（v1.3 增补）
+
+- `AgentLoop` 增 `memory` 参数：buildSystemText 的记忆段（`[相关记忆]` 段，逐行 `- <text>`，最多 `memoryLimit` 条，空记忆不占位）；`_finish` 时 `remember('用户：<input>\n助手：<reply>', tags: {conversation})`（reply 非空才记）；`run` 开头 `memory.load()`；
+- `memoryLimit` 缺省 5。
+
 ## 7. 有意偏离
 
 （无。）

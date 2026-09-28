@@ -1,0 +1,54 @@
+{
+  "name": "recall-scoring",
+  "kind": "recall-scoring",
+  "cases": [
+    {
+      "label": "中文二元组命中",
+      "query": "京剧",
+      "expect": {
+        "texts": [
+          "用户喜欢京剧"
+        ]
+      }
+    },
+    {
+      "label": "同分新→旧（「喜欢」命中两条）",
+      "query": "喜欢",
+      "expect": {
+        "texts": [
+          "用户喜欢喝咖啡",
+          "用户喜欢京剧"
+        ]
+      }
+    },
+    {
+      "label": "英文按词命中",
+      "query": "coffee",
+      "expect": {
+        "texts": [
+          "love coffee in the morning"
+        ]
+      }
+    },
+    {
+      "label": "交集计数：多词查询更高分在前",
+      "query": "喜欢 咖啡",
+      "expect": {
+        "texts": [
+          "用户喜欢喝咖啡",
+          "用户喜欢京剧"
+        ]
+      }
+    },
+    {
+      "label": "无命中与 limit 截断",
+      "query": "不存在的词",
+      "expect": {
+        "texts": [],
+        "limitOne": [
+          "用户喜欢喝咖啡"
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "name": "forget-and-govern",
+  "kind": "forget-and-govern",
+  "expect": {
+    "afterGovern": [
+      "第二条",
+      "第三条"
+    ],
+    "forgot": false,
+    "byText": 1,
+    "matching": 1,
+    "lengthAfterClear": 0
+  }
+}

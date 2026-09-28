@@ -1,0 +1,59 @@
+{
+  "name": "skill",
+  "kind": "skill",
+  "nameCases": [
+    {
+      "input": "Foo Bar!",
+      "expect": "foo_bar"
+    },
+    {
+      "input": "___",
+      "expect": "skill"
+    },
+    {
+      "input": " 你好 World ",
+      "expect": "world"
+    }
+  ],
+  "metaCases": [
+    {
+      "label": "JSON 命中",
+      "input": "{\"name\":\"SearchWeb\",\"description\":\"搜索网络\"}",
+      "tools": [
+        "search"
+      ],
+      "expect": {
+        "name": "searchweb",
+        "description": "搜索网络"
+      }
+    },
+    {
+      "label": "name 缺失回退确定性",
+      "input": "只有描述",
+      "tools": [
+        "a",
+        "b"
+      ],
+      "expect": {
+        "name": "skill_a_b",
+        "description": "自动沉淀的技能：依次调用 a、b。"
+      }
+    }
+  ],
+  "expect": {
+    "skillParams": [
+      "name"
+    ],
+    "skillResultContent": "再见 小明",
+    "skillResultValue": [
+      "你好 小明！",
+      "再见 小明"
+    ],
+    "extractedName": "skill_echo",
+    "extractedRegistered": true,
+    "highRiskNotExtracted": true,
+    "deniedNotExtracted": true,
+    "restored": 1,
+    "restoredRegistered": true
+  }
+}

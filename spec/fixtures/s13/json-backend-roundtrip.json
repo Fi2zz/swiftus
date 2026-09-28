@@ -1,0 +1,14 @@
+{
+  "name": "json-backend-roundtrip",
+  "kind": "json-backend-roundtrip",
+  "expect": {
+    "reopenedTexts": [
+      "用户喜欢京剧"
+    ],
+    "reopenedTags": [
+      [
+        "偏好"
+      ]
+    ]
+  }
+}
