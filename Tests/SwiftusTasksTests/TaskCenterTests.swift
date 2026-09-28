@@ -300,14 +300,11 @@ struct TaskCenterTests {
     @ContextTreeActor
     func shellTrackingAfterDispose() async throws {
         let center = try DefaultTaskCenter(clock: s17FixedClock)
-        let executor = TrackingTaskShellExecutor(
-            inner: StubTaskShellExecutor(exitCodes: ["sleep 1": 0]),
-            tasks: center
-        )
-        let process = try await executor.start(TaskShellSpec(command: "sleep 1"))
+        let executor = TrackingTaskShellExecutor(inner: LocalShellExecutor(), tasks: center)
+        let process = try await executor.start(executor.resolve(ShellExecRequest(command: "sleep 1")))
         center.dispose()
         _ = process.kill()
-        _ = await process.wait()
+        await process.done.value
         // 给追踪任务一点落定时间：它会因中心已释放而失败并被静默吞掉。
         try await _Concurrency.Task.sleep(for: .milliseconds(50))
         // dispose 后的落定失败被吞掉：不抛错、任务停在 running。

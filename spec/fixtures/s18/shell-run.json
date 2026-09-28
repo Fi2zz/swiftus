@@ -64,13 +64,14 @@
       }
     },
     {
-      "label": "超时中断：timedOut 为真且退出码为负",
+      "label": "超时中断：timedOut 为真且退出码非 0",
       "input": {
         "command": "sleep 5",
-        "timeoutMs": 300
+        "timeoutMs": 300,
+        "signaledExit": true
       },
       "expect": {
-        "exitCode": -9,
+        "exitCodeIsNonZero": true,
         "timedOut": true,
         "timeoutMs": 300,
         "stdout": "",
@@ -82,7 +83,8 @@
     {
       "label": "采集上限截断：超出部分置 truncated",
       "input": {
-        "command": "head -c 2000 /dev/zero | tr \"\\0\" \"a\""
+        "command": "head -c 2000 /dev/zero | tr \"\\0\" \"a\"",
+        "stdoutMaxBytes": 100
       },
       "expect": {
         "exitCode": 0,

@@ -18,14 +18,15 @@
     },
     {
       "scenario": "kill",
-      "label": "后台进程：kill 后状态转 killed、退出码为负、重复 kill 返回 false",
+      "label": "后台进程：kill 后状态转 killed、退出码非 0、重复 kill 返回 false",
       "input": {
-        "command": "sleep 30"
+        "command": "sleep 30",
+        "signaledExit": true
       },
       "expect": {
         "firstKill": true,
         "status": "killed",
-        "exitCodeIsNegative": true,
+        "exitCodeIsNonZero": true,
         "secondKill": false
       }
     }

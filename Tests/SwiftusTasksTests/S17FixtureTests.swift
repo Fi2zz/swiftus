@@ -633,25 +633,19 @@ struct S17FixtureTests {
             ]
         case "shell-foreground":
             let command = caseItem["command"]?.stringValue ?? "echo hello"
-            let exitCode = caseItem["expect"]?.objectValue?["exitCode"]?.intValue ?? 0
-            let executor = TrackingTaskShellExecutor(
-                inner: StubTaskShellExecutor(exitCodes: [command: Int(exitCode)]),
-                tasks: center
-            )
-            let result = try await executor.run(TaskShellSpec(command: command))
+            // 真跑本地执行器（S18），不替身：命令、退出码与任务载荷都由真实进程产出。
+            let executor = TrackingTaskShellExecutor(inner: LocalShellExecutor(), tasks: center)
+            let result = try await executor.run(executor.resolve(ShellExecRequest(command: command)))
             return [
                 "exitCode": result.exitCode.map { JSONValue.int(Int64($0)) } ?? .null,
                 "task": .object(s17Project(center.all.first ?? s17Sample(), ids)),
             ]
         case "shell-killed":
             let command = caseItem["command"]?.stringValue ?? "sleep 30"
-            let executor = TrackingTaskShellExecutor(
-                inner: StubTaskShellExecutor(exitCodes: [command: -9]),
-                tasks: center
-            )
-            let process = try await executor.start(TaskShellSpec(command: command))
+            let executor = TrackingTaskShellExecutor(inner: LocalShellExecutor(), tasks: center)
+            let process = try await executor.start(executor.resolve(ShellExecRequest(command: command)))
             _ = process.kill()
-            _ = await process.wait()
+            await process.done.value
             let task = center.all.first ?? s17Sample()
             try await s17WaitTerminal(center, task.id)
             let settled = center.get(task.id) ?? task

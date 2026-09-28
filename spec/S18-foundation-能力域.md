@@ -71,9 +71,9 @@
 - 错误：无异常类型——`run` 只对**基础设施故障** reject；非零退出 / 超时中断 / 取消中断都**正常返回**结果值（这是能力缝的硬约定，模型据此区分「命令跑失败」与「执行器坏了」）；
 - `ShellExecRequest = {command, workdir?, timeoutMs?, stdoutMaxBytes?, stdin?, env?, cancelSignal?}`；`ShellExecSpec` 是**补齐并封顶后**的规格（`command` / `workdir` / `timeoutMs` / `stdoutMaxBytes` / `stdin?` / `env?` / `cancelSignal?`）；
 - `resolve(request)`：缺省补齐 + **封顶**——`timeoutMs ?? 实例默认` 后按 `maxTimeoutMs` 封顶；`stdoutMaxBytes ?? 实例默认`；`workdir ?? 实例 cwd ?? 进程当前目录`；
-- `CollectedOutput = {text, truncated?, spillPath?}`；`ShellRunResult = {exitCode?, timedOut, timeoutMs, stdout, stderr}`——**`timedOut` 与 `exitCode` 互不覆盖**（命令自己处理信号时可能既超时又退出 0）；被信号杀死时 `exitCode` 是**负数**（macOS/Linux 的 SIGKILL 为 `-9`，见 §7 偏离）；
+- `CollectedOutput = {text, truncated?, spillPath?}`；`ShellRunResult = {exitCode?, timedOut, timeoutMs, stdout, stderr}`——**`timedOut` 与 `exitCode` 互不覆盖**（命令自己处理信号时可能既超时又退出 0）；被信号杀死时 `exitCode` **非 0**（其符号表示随运行时而异，见 §7 偏离）；
 - `ShellProcessStatus`：`running` / `completed` / `killed`（恰好落定一次）；`ShellProcessRead = {delta, lossy?, stdoutSpillPath?, stderrSpillPath?}`；
-- `ShellProcess`：`status` / `exitCode?`（被信号杀死时为负数）/ `done`（落定后完成，**永不 reject**）/ `readOutput()`（**消费式增量**，不重复投递）/ `kill()`（已结束返回 false，幂等）。
+- `ShellProcess`：`status` / `exitCode?`（被信号杀死时非 0）/ `done`（落定后完成，**永不 reject**）/ `readOutput()`（**消费式增量**，不重复投递）/ `kill()`（已结束返回 false，幂等）。
 
 ## 5. Shell 本地实现语义
 
@@ -108,7 +108,7 @@
 ## 7. 有意偏离
 
 - **Windows 分支不移植**（AGENTS 已定）：路径规范化的 `\` 切分与盘符判定仍按协议保留（跨平台输入同形），但实际执行与 `cmd /c` 不实现；`/dev/null` 等平台路径不入规格。
-- **被信号杀死时的退出码**：Dart 的 `ShellProcess` / `ShellRunResult` 文档注释写「被信号杀死时 exitCode 为 null」，**实现给的是负数**（`-9` = SIGKILL）；本规格按实现行为锁定（负数），并把文档措辞的偏差登记在此。
+- **被信号杀死时的退出码**：Dart 的文档注释写「为 null」而实现给的是**负数**（`-9` = SIGKILL）；Foundation 的 `Process.terminationStatus` 给的是**信号号**（SIGKILL → `9`，配 `terminationReason == .uncaughtSignal`）。符号是运行时细节，协议只锁定「非 0」，fixtures 只断言非 0。硬杀统一用 SIGKILL（与 Dart 的 `Process.kill(ProcessSignal.sigkill)` 同款；`Process.terminate()` 发的是 SIGTERM，给被测进程留了自行退出的机会）。
 - **shell 输出不做 spill 落盘**：`spillPath` 是「截断且能提供」的可选字段，本地实现**不提供**（结构保留、恒为空）——落盘策略留给上层策略插件。
 - **超时的执行器内中断**：Dart 用 `Timer` + `SIGKILL`；Swiftus 用注入的等待器 + `kill(SIGKILL)`，语义等价但可测（AGENTS 的 Clock 纪律）。
 - **缺失目标的身份键在「父目录后创建」时会变**：Dart 与本移植一致（父目录解析时不存在 → 兜底展示路径；事后创建 → 变为真实父路径 + basename）。Dart 注释里「目录创建后键仍稳定」的说法只在父目录已存在时成立，按实际行为实现并在此登记。

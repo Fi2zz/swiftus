@@ -496,10 +496,18 @@ Future<Map<String, Object?>> _shellResolve() async {
 Future<Map<String, Object?>> _shellRun() async {
   final LocalShellExecutor executor =
       LocalShellExecutor(cwd: _tempDir().path, timeoutMs: 2000);
-  Future<Map<String, Object?>> run(ShellExecRequest request) async {
+  Future<Map<String, Object?>> run(
+    ShellExecRequest request, {
+    bool projectExitCode = true,
+  }) async {
     final ShellRunResult result = await executor.run(executor.resolve(request));
     return <String, Object?>{
-      'exitCode': result.exitCode,
+      // 被信号杀死时 Dart 给 -9、Foundation 给信号号（正数）——符号是运行时细节，
+      // 协议只要求「非 0」，故这类用例不投影原始码。
+      if (projectExitCode)
+        'exitCode': result.exitCode
+      else
+        'exitCodeIsNonZero': (result.exitCode ?? 0) != 0,
       'timedOut': result.timedOut,
       'timeoutMs': result.timeoutMs,
       'stdout': result.stdout.text,
@@ -534,14 +542,24 @@ Future<Map<String, Object?>> _shellRun() async {
         'expect': await run(const ShellExecRequest(command: 'cat', stdin: '喂你\n')),
       },
       <String, Object?>{
-        'label': '超时中断：timedOut 为真且退出码为负',
-        'input': <String, Object?>{'command': 'sleep 5', 'timeoutMs': 300},
+        'label': '超时中断：timedOut 为真且退出码非 0',
+        'input': <String, Object?>{
+          'command': 'sleep 5',
+          'timeoutMs': 300,
+          // 被信号杀死：退出码只断言「非 0」，符号随运行时而异。
+          'signaledExit': true,
+        },
         'expect': await run(
-            const ShellExecRequest(command: 'sleep 5', timeoutMs: 300)),
+          const ShellExecRequest(command: 'sleep 5', timeoutMs: 300),
+          projectExitCode: false,
+        ),
       },
       <String, Object?>{
         'label': '采集上限截断：超出部分置 truncated',
-        'input': <String, Object?>{'command': 'head -c 2000 /dev/zero | tr "\\0" "a"'},
+        'input': <String, Object?>{
+          'command': 'head -c 2000 /dev/zero | tr "\\0" "a"',
+          'stdoutMaxBytes': 100,
+        },
         'expect': await run(ShellExecRequest(
             command: 'head -c 2000 /dev/zero | tr "\\0" "a"',
             stdoutMaxBytes: 100)),
@@ -595,12 +613,12 @@ Future<Map<String, Object?>> _startKillCase(
   final bool secondKill = process.kill();
   return <String, Object?>{
     'scenario': 'kill',
-    'label': '后台进程：kill 后状态转 killed、退出码为负、重复 kill 返回 false',
-    'input': <String, Object?>{'command': 'sleep 30'},
+    'label': '后台进程：kill 后状态转 killed、退出码非 0、重复 kill 返回 false',
+    'input': <String, Object?>{'command': 'sleep 30', 'signaledExit': true},
     'expect': <String, Object?>{
       'firstKill': firstKill,
       'status': process.status.name,
-      'exitCodeIsNegative': (process.exitCode ?? 0) < 0,
+      'exitCodeIsNonZero': (process.exitCode ?? 0) != 0,
       'secondKill': secondKill,
     },
   };

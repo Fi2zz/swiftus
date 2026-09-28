@@ -97,106 +97,67 @@ public final class TaskTracking: AgentTurnTracker {
 }
 
 // ══════════════════════════════════════════════════════════════
-// shell 执行追踪（规格 S17 §5.4）
+// shell 执行追踪（规格 S17 §5.4；执行端口见 S18 §4）
 // ══════════════════════════════════════════════════════════════
-
-/// 被追踪的命令。
-public struct TaskShellSpec: Sendable, Equatable {
-    /// 命令行。
-    public let command: String
-
-    public init(command: String) {
-        self.command = command
-    }
-}
-
-/// 前台执行结局。
-public struct TaskShellRunResult: Sendable, Equatable {
-    /// 退出码（null 表示无退出码）。
-    public let exitCode: Int?
-
-    public init(exitCode: Int? = nil) {
-        self.exitCode = exitCode
-    }
-}
-
-/// 后台进程句柄。
-@ContextTreeActor
-public protocol TaskShellProcess: Sendable {
-    /// 结束后的退出码（未结束为 nil）。
-    var exitCode: Int? { get }
-
-    /// 等待进程结束，返回退出码。
-    func wait() async -> Int?
-
-    /// 终止进程；返回是否确实终止了一个存活进程。
-    @discardableResult
-    func kill() -> Bool
-}
-
-/// shell 执行端口（能力缝）：Swiftus 的 shell 能力域属 W3，本端口是任务追踪
-/// 需要的最小形状（W3 落地后由其实现或适配，规格 S17 §5.4 / §7）。
-@ContextTreeActor
-public protocol TaskShellExecutor: Sendable {
-    /// 前台执行。
-    func run(_ spec: TaskShellSpec) async throws -> TaskShellRunResult
-
-    /// 后台启动。
-    func start(_ spec: TaskShellSpec) async throws -> any TaskShellProcess
-}
 
 /// 给 shell 执行器加任务追踪的装饰器：每次前台 / 后台执行建一个 shell 任务，
 /// 进程落定时按退出码置 completed / failed。
+///
+/// 包裹的是 S18 的 `ShellExecutor`（本地后端 / 任意执行器），S17 §7 记录的
+/// 「任务域自带 shell 端口」偏离在此收口。
 @ContextTreeActor
-public final class TrackingTaskShellExecutor: TaskShellExecutor {
+public final class TrackingTaskShellExecutor: ShellExecutor {
     /// 被包装的执行器。
-    public let inner: any TaskShellExecutor
+    public let inner: any ShellExecutor
     /// 任务中心。
     public let tasks: any TaskCenter
 
-    public init(inner: any TaskShellExecutor, tasks: any TaskCenter) {
+    public init(inner: any ShellExecutor, tasks: any TaskCenter) {
         self.inner = inner
         self.tasks = tasks
     }
 
-    public func run(_ spec: TaskShellSpec) async throws -> TaskShellRunResult {
+    public func resolve(_ request: ShellExecRequest) -> ShellExecSpec {
+        inner.resolve(request)
+    }
+
+    public func run(_ spec: ShellExecSpec) async throws -> ShellRunResult {
         let task = try await begin(spec)
         let result = try await inner.run(spec)
         try await finish(task.id, exitCode: result.exitCode)
         return result
     }
 
-    public func start(_ spec: TaskShellSpec) async throws -> any TaskShellProcess {
+    public func start(_ spec: ShellExecSpec) async throws -> any ShellProcess {
         let task = try await begin(spec)
         let process = try await inner.start(spec)
         track(task.id, process)
         return process
     }
 
-    private func begin(_ spec: TaskShellSpec) async throws -> Task {
+    private func begin(_ spec: ShellExecSpec) async throws -> Task {
         let task = try await tasks.create(
             kind: .shell,
             description: "Shell: \(spec.command)",
             metadata: ["command": .string(spec.command)]
         )
-        try await tasks.update(task.id, status: .running)
+        try await tasks.update(task.id, status: .running, result: nil, error: nil)
         return task
     }
 
     /// 后台进程结束落定；追踪失败（中心已释放或任务已终态）时静默让位给
     /// 执行结果本身（规格 S17 §5.4）。
-    private func track(_ id: String, _ process: any TaskShellProcess) {
+    private func track(_ id: String, _ process: any ShellProcess) {
         let center = tasks
         // 本 target 另有 Task 值类型，闭包任务需写全 _Concurrency.Task。
         _Concurrency.Task<Void, Never> { [center] in
-            let exitCode = await process.wait()
-            let result: JSONValue = .object([
-                "exitCode": exitCode.map { JSONValue.int(Int64($0)) } ?? .null,
-            ])
+            // done 落定后 exitCode 已是终值（同一 actor 上同步可读），不再 await。
+            await process.done.value
+            let exitCode = process.exitCode
             _ = try? await center.update(
                 id,
                 status: exitCode == 0 ? .completed : .failed,
-                result: result,
+                result: .object(["exitCode": exitCode.map { JSONValue.int(Int64($0)) } ?? .null]),
                 error: nil
             )
         }

@@ -245,46 +245,6 @@ func s17Text(_ content: String) -> LlmResult {
     LlmResult(content: content, provider: "scripted", model: "m")
 }
 
-/// shell 执行端口替身：命令 → 退出码（规格 S17 §5.4 的能力缝替身）。
-@ContextTreeActor
-final class StubTaskShellExecutor: TaskShellExecutor {
-    private let exitCodes: [String: Int?]
-
-    init(exitCodes: [String: Int?]) {
-        self.exitCodes = exitCodes
-    }
-
-    func run(_ spec: TaskShellSpec) async throws -> TaskShellRunResult {
-        TaskShellRunResult(exitCode: exitCodes[spec.command] ?? nil)
-    }
-
-    func start(_ spec: TaskShellSpec) async throws -> any TaskShellProcess {
-        StubTaskShellProcess(exitCode: exitCodes[spec.command] ?? nil)
-    }
-}
-
-/// 后台进程替身：立即落定到预设退出码。
-@ContextTreeActor
-final class StubTaskShellProcess: TaskShellProcess {
-    private let code: Int?
-    private var killed = false
-
-    init(exitCode: Int?) {
-        code = exitCode
-    }
-
-    var exitCode: Int? { code }
-
-    func wait() async -> Int? { code }
-
-    @discardableResult
-    func kill() -> Bool {
-        guard !killed else { return false }
-        killed = true
-        return true
-    }
-}
-
 /// 轮询等待任务落定（后台进程追踪是异步落定的）。
 @ContextTreeActor
 func s17WaitTerminal(_ center: any TaskCenter, _ id: String) async throws {
