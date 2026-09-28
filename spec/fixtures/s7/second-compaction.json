@@ -1,0 +1,161 @@
+{
+  "name": "second-compaction",
+  "sessionId": "s1",
+  "events": [
+    {
+      "type": "e0"
+    },
+    {
+      "type": "e1"
+    },
+    {
+      "type": "e2"
+    },
+    {
+      "type": "e3"
+    },
+    {
+      "type": "e4"
+    }
+  ],
+  "rounds": [
+    {
+      "keepRecent": 1,
+      "summary": {
+        "text": "v1"
+      }
+    },
+    {
+      "keepRecent": 1,
+      "summary": {
+        "text": "v2"
+      }
+    }
+  ],
+  "expect": {
+    "results": [
+      {
+        "compacted": 4,
+        "kept": 1,
+        "shadowedSeqs": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "startSeq": 5,
+        "summarySeq": 6,
+        "endSeq": 7,
+        "summary": "v1"
+      },
+      {
+        "compacted": 7,
+        "kept": 1,
+        "shadowedSeqs": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "startSeq": 8,
+        "summarySeq": 9,
+        "endSeq": 10,
+        "summary": "v2"
+      }
+    ],
+    "log": [
+      {
+        "seq": 0,
+        "type": "e0"
+      },
+      {
+        "seq": 1,
+        "type": "e1"
+      },
+      {
+        "seq": 2,
+        "type": "e2"
+      },
+      {
+        "seq": 3,
+        "type": "e3"
+      },
+      {
+        "seq": 4,
+        "type": "e4"
+      },
+      {
+        "seq": 5,
+        "type": "compaction/start",
+        "data": {
+          "compactionId": "<cmp-1>",
+          "keepRecent": 1
+        }
+      },
+      {
+        "seq": 6,
+        "type": "compaction/summary",
+        "data": {
+          "compactionId": "<cmp-1>",
+          "summary": "v1",
+          "shadowedSeqs": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "kept": 1
+        }
+      },
+      {
+        "seq": 7,
+        "type": "compaction/end",
+        "data": {
+          "compactionId": "<cmp-1>"
+        }
+      },
+      {
+        "seq": 8,
+        "type": "compaction/start",
+        "data": {
+          "compactionId": "<cmp-2>",
+          "keepRecent": 1
+        }
+      },
+      {
+        "seq": 9,
+        "type": "compaction/summary",
+        "data": {
+          "compactionId": "<cmp-2>",
+          "summary": "v2",
+          "shadowedSeqs": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ],
+          "kept": 1
+        }
+      },
+      {
+        "seq": 10,
+        "type": "compaction/end",
+        "data": {
+          "compactionId": "<cmp-2>"
+        }
+      }
+    ],
+    "previousSeen": [
+      "",
+      "v1"
+    ],
+    "summaryOf": "v2",
+    "invariantViolations": []
+  }
+}

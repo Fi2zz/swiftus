@@ -1,0 +1,118 @@
+{
+  "name": "tool-pair-split",
+  "sessionId": "s1",
+  "events": [
+    {
+      "type": "user/message",
+      "data": {
+        "text": "查一下"
+      }
+    },
+    {
+      "type": "assistant/message",
+      "data": {
+        "text": "",
+        "toolCalls": [
+          {
+            "id": "c1",
+            "name": "search",
+            "arguments": "{}"
+          }
+        ]
+      }
+    },
+    {
+      "type": "tool/result",
+      "data": {
+        "callId": "c1",
+        "content": "结果"
+      }
+    }
+  ],
+  "rounds": [
+    {
+      "keepRecent": 1,
+      "summary": {
+        "text": "摘要"
+      }
+    }
+  ],
+  "expect": {
+    "results": [
+      {
+        "compacted": 1,
+        "kept": 2,
+        "shadowedSeqs": [
+          0
+        ],
+        "startSeq": 3,
+        "summarySeq": 4,
+        "endSeq": 5,
+        "summary": "摘要"
+      }
+    ],
+    "log": [
+      {
+        "seq": 0,
+        "type": "user/message",
+        "data": {
+          "text": "查一下"
+        }
+      },
+      {
+        "seq": 1,
+        "type": "assistant/message",
+        "data": {
+          "text": "",
+          "toolCalls": [
+            {
+              "id": "c1",
+              "name": "search",
+              "arguments": "{}"
+            }
+          ]
+        }
+      },
+      {
+        "seq": 2,
+        "type": "tool/result",
+        "data": {
+          "callId": "c1",
+          "content": "结果"
+        }
+      },
+      {
+        "seq": 3,
+        "type": "compaction/start",
+        "data": {
+          "compactionId": "<cmp-1>",
+          "keepRecent": 1
+        }
+      },
+      {
+        "seq": 4,
+        "type": "compaction/summary",
+        "data": {
+          "compactionId": "<cmp-1>",
+          "summary": "摘要",
+          "shadowedSeqs": [
+            0
+          ],
+          "kept": 2
+        }
+      },
+      {
+        "seq": 5,
+        "type": "compaction/end",
+        "data": {
+          "compactionId": "<cmp-1>"
+        }
+      }
+    ],
+    "previousSeen": [
+      ""
+    ],
+    "summaryOf": "摘要",
+    "invariantViolations": []
+  }
+}

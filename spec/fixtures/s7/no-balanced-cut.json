@@ -1,0 +1,51 @@
+{
+  "name": "no-balanced-cut",
+  "sessionId": "s1",
+  "events": [
+    {
+      "type": "assistant/message",
+      "data": {
+        "text": "",
+        "toolCalls": [
+          {
+            "id": "c1",
+            "name": "search",
+            "arguments": "{}"
+          }
+        ]
+      }
+    }
+  ],
+  "rounds": [
+    {
+      "keepRecent": 0,
+      "summary": {
+        "text": "摘要"
+      }
+    }
+  ],
+  "expect": {
+    "results": [
+      null
+    ],
+    "log": [
+      {
+        "seq": 0,
+        "type": "assistant/message",
+        "data": {
+          "text": "",
+          "toolCalls": [
+            {
+              "id": "c1",
+              "name": "search",
+              "arguments": "{}"
+            }
+          ]
+        }
+      }
+    ],
+    "previousSeen": [],
+    "summaryOf": null,
+    "invariantViolations": []
+  }
+}

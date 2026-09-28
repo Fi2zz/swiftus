@@ -1,0 +1,91 @@
+{
+  "name": "invariant-not-prefix",
+  "sessionId": "s1",
+  "events": [
+    {
+      "type": "e0"
+    },
+    {
+      "type": "e1"
+    },
+    {
+      "type": "e2"
+    },
+    {
+      "type": "compaction/start",
+      "data": {
+        "compactionId": "c1",
+        "keepRecent": 1
+      }
+    },
+    {
+      "type": "compaction/summary",
+      "data": {
+        "compactionId": "c1",
+        "summary": "摘要",
+        "shadowedSeqs": [
+          1,
+          2
+        ],
+        "kept": 1
+      }
+    },
+    {
+      "type": "compaction/end",
+      "data": {
+        "compactionId": "c1"
+      }
+    }
+  ],
+  "rounds": [],
+  "expect": {
+    "results": [],
+    "log": [
+      {
+        "seq": 0,
+        "type": "e0"
+      },
+      {
+        "seq": 1,
+        "type": "e1"
+      },
+      {
+        "seq": 2,
+        "type": "e2"
+      },
+      {
+        "seq": 3,
+        "type": "compaction/start",
+        "data": {
+          "compactionId": "<cmp-1>",
+          "keepRecent": 1
+        }
+      },
+      {
+        "seq": 4,
+        "type": "compaction/summary",
+        "data": {
+          "compactionId": "<cmp-1>",
+          "summary": "摘要",
+          "shadowedSeqs": [
+            1,
+            2
+          ],
+          "kept": 1
+        }
+      },
+      {
+        "seq": 5,
+        "type": "compaction/end",
+        "data": {
+          "compactionId": "<cmp-1>"
+        }
+      }
+    ],
+    "previousSeen": [],
+    "summaryOf": null,
+    "invariantViolations": [
+      "seq 4 的 compaction/summary 折叠的不是日志开头的一段"
+    ]
+  }
+}

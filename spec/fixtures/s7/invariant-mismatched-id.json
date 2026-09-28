@@ -1,0 +1,91 @@
+{
+  "name": "invariant-mismatched-id",
+  "sessionId": "s1",
+  "events": [
+    {
+      "type": "e0"
+    },
+    {
+      "type": "e1"
+    },
+    {
+      "type": "e2"
+    },
+    {
+      "type": "compaction/start",
+      "data": {
+        "compactionId": "c1",
+        "keepRecent": 1
+      }
+    },
+    {
+      "type": "compaction/summary",
+      "data": {
+        "compactionId": "c2",
+        "summary": "摘要",
+        "shadowedSeqs": [
+          0
+        ],
+        "kept": 1
+      }
+    },
+    {
+      "type": "compaction/end",
+      "data": {
+        "compactionId": "c1",
+        "error": "boom"
+      }
+    }
+  ],
+  "rounds": [],
+  "expect": {
+    "results": [],
+    "log": [
+      {
+        "seq": 0,
+        "type": "e0"
+      },
+      {
+        "seq": 1,
+        "type": "e1"
+      },
+      {
+        "seq": 2,
+        "type": "e2"
+      },
+      {
+        "seq": 3,
+        "type": "compaction/start",
+        "data": {
+          "compactionId": "<cmp-1>",
+          "keepRecent": 1
+        }
+      },
+      {
+        "seq": 4,
+        "type": "compaction/summary",
+        "data": {
+          "compactionId": "<cmp-2>",
+          "summary": "摘要",
+          "shadowedSeqs": [
+            0
+          ],
+          "kept": 1
+        }
+      },
+      {
+        "seq": 5,
+        "type": "compaction/end",
+        "data": {
+          "compactionId": "<cmp-1>",
+          "error": "boom"
+        }
+      }
+    ],
+    "previousSeen": [],
+    "summaryOf": null,
+    "invariantViolations": [
+      "seq 4 的 compaction/summary 身份 c2 与进行中的压缩 c1 不一致"
+    ]
+  }
+}

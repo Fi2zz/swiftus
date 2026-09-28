@@ -1,0 +1,106 @@
+{
+  "name": "plain-5-keep-2",
+  "sessionId": "s1",
+  "events": [
+    {
+      "type": "e0"
+    },
+    {
+      "type": "e1"
+    },
+    {
+      "type": "e2"
+    },
+    {
+      "type": "e3"
+    },
+    {
+      "type": "e4"
+    }
+  ],
+  "rounds": [
+    {
+      "keepRecent": 2,
+      "summary": {
+        "text": "摘要",
+        "provider": "fake",
+        "model": "fake-model"
+      }
+    }
+  ],
+  "expect": {
+    "results": [
+      {
+        "compacted": 3,
+        "kept": 2,
+        "shadowedSeqs": [
+          0,
+          1,
+          2
+        ],
+        "startSeq": 5,
+        "summarySeq": 6,
+        "endSeq": 7,
+        "summary": "摘要"
+      }
+    ],
+    "log": [
+      {
+        "seq": 0,
+        "type": "e0"
+      },
+      {
+        "seq": 1,
+        "type": "e1"
+      },
+      {
+        "seq": 2,
+        "type": "e2"
+      },
+      {
+        "seq": 3,
+        "type": "e3"
+      },
+      {
+        "seq": 4,
+        "type": "e4"
+      },
+      {
+        "seq": 5,
+        "type": "compaction/start",
+        "data": {
+          "compactionId": "<cmp-1>",
+          "keepRecent": 2
+        }
+      },
+      {
+        "seq": 6,
+        "type": "compaction/summary",
+        "data": {
+          "compactionId": "<cmp-1>",
+          "summary": "摘要",
+          "shadowedSeqs": [
+            0,
+            1,
+            2
+          ],
+          "kept": 2,
+          "provider": "fake",
+          "model": "fake-model"
+        }
+      },
+      {
+        "seq": 7,
+        "type": "compaction/end",
+        "data": {
+          "compactionId": "<cmp-1>"
+        }
+      }
+    ],
+    "previousSeen": [
+      ""
+    ],
+    "summaryOf": "摘要",
+    "invariantViolations": []
+  }
+}

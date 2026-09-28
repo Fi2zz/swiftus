@@ -1,0 +1,53 @@
+{
+  "name": "invariant-unclosed",
+  "sessionId": "s1",
+  "events": [
+    {
+      "type": "e0"
+    },
+    {
+      "type": "e1"
+    },
+    {
+      "type": "e2"
+    },
+    {
+      "type": "compaction/start",
+      "data": {
+        "compactionId": "c1",
+        "keepRecent": 1
+      }
+    }
+  ],
+  "rounds": [],
+  "expect": {
+    "results": [],
+    "log": [
+      {
+        "seq": 0,
+        "type": "e0"
+      },
+      {
+        "seq": 1,
+        "type": "e1"
+      },
+      {
+        "seq": 2,
+        "type": "e2"
+      },
+      {
+        "seq": 3,
+        "type": "compaction/start",
+        "data": {
+          "compactionId": "<cmp-1>",
+          "keepRecent": 1
+        }
+      }
+    ],
+    "previousSeen": [],
+    "summaryOf": null,
+    "invariantViolations": [
+      "身份 c1 的压缩没有 compaction/end 收尾"
+    ]
+  }
+}

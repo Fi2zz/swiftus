@@ -1,0 +1,63 @@
+{
+  "name": "summarizer-throws",
+  "sessionId": "s1",
+  "events": [
+    {
+      "type": "e0"
+    },
+    {
+      "type": "e1"
+    },
+    {
+      "type": "e2"
+    }
+  ],
+  "rounds": [
+    {
+      "keepRecent": 1,
+      "throws": "boom"
+    }
+  ],
+  "expect": {
+    "results": [
+      {
+        "threw": true
+      }
+    ],
+    "log": [
+      {
+        "seq": 0,
+        "type": "e0"
+      },
+      {
+        "seq": 1,
+        "type": "e1"
+      },
+      {
+        "seq": 2,
+        "type": "e2"
+      },
+      {
+        "seq": 3,
+        "type": "compaction/start",
+        "data": {
+          "compactionId": "<cmp-1>",
+          "keepRecent": 1
+        }
+      },
+      {
+        "seq": 4,
+        "type": "compaction/end",
+        "data": {
+          "compactionId": "<cmp-1>",
+          "error": "boom"
+        }
+      }
+    ],
+    "previousSeen": [
+      ""
+    ],
+    "summaryOf": null,
+    "invariantViolations": []
+  }
+}
