@@ -28,7 +28,7 @@ public final class EnvCredentials: Credentials {
         throw CredentialsException(.readOnly, "环境变量凭据是只读来源。")
     }
 
-    public func refresh() async {
+    public func refresh() async throws {
         snapshot.refreshSnapshot(readAll())
     }
 

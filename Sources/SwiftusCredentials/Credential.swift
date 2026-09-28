@@ -43,7 +43,11 @@ public struct CredentialsException: Error, Equatable {
         case missing
         case readOnly = "read-only"
         case vaultHttp = "vault-http"
+        case vaultNetwork = "vault-network"
         case awsHttp = "aws-http"
+        case awsNetwork = "aws-network"
+        /// 来源载荷不可解析（Swift 侧新增码，见 S12 §2）。
+        case invalidSource = "invalid-source"
     }
 
     public let code: Code

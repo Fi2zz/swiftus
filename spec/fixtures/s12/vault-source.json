@@ -1,0 +1,204 @@
+{
+  "name": "vault-source",
+  "kind": "vault-source",
+  "cases": [
+    {
+      "scenario": "refresh",
+      "label": "URL / 方法 / Token 头正确并解析 data.data",
+      "input": {
+        "status": 200,
+        "body": "{\"data\":{\"data\":{\"ARK_API_KEY\":\"vault-key\",\"DEEPSEEK_API_KEY\":{\"value\":\"ds-key\"}}}}",
+        "networkError": false,
+        "address": "http://127.0.0.1:8200/",
+        "token": "vault-token",
+        "path": "conatus/llm",
+        "mount": "secret"
+      },
+      "expect": {
+        "result": {
+          "request": {
+            "sent": true,
+            "method": "GET",
+            "url": "http://127.0.0.1:8200/v1/secret/data/conatus/llm",
+            "contentType": null,
+            "token": "vault-token",
+            "target": null,
+            "hasSessionToken": false,
+            "contentSha256": null,
+            "amzDateFormat": false,
+            "authorization": {
+              "present": false
+            },
+            "body": ""
+          },
+          "snapshot": {
+            "ARK_API_KEY": {
+              "value": "vault-key",
+              "expiresAt": null
+            },
+            "DEEPSEEK_API_KEY": {
+              "value": "ds-key",
+              "expiresAt": null
+            }
+          },
+          "keys": [
+            "ARK_API_KEY",
+            "DEEPSEEK_API_KEY"
+          ],
+          "code": ""
+        }
+      }
+    },
+    {
+      "scenario": "refresh",
+      "label": "地址末尾斜杠规范化：多斜杠与根路径都拼出同一 URL",
+      "input": {
+        "status": 200,
+        "body": "{\"data\":{\"data\":{\"ARK_API_KEY\":\"vault-key\",\"DEEPSEEK_API_KEY\":{\"value\":\"ds-key\"}}}}",
+        "networkError": false,
+        "address": "http://127.0.0.1:8200///",
+        "token": "vault-token",
+        "path": "conatus/llm",
+        "mount": "kv2"
+      },
+      "expect": {
+        "result": {
+          "request": {
+            "sent": true,
+            "method": "GET",
+            "url": "http://127.0.0.1:8200/v1/kv2/data/conatus/llm",
+            "contentType": null,
+            "token": "vault-token",
+            "target": null,
+            "hasSessionToken": false,
+            "contentSha256": null,
+            "amzDateFormat": false,
+            "authorization": {
+              "present": false
+            },
+            "body": ""
+          },
+          "snapshot": {
+            "ARK_API_KEY": {
+              "value": "vault-key",
+              "expiresAt": null
+            },
+            "DEEPSEEK_API_KEY": {
+              "value": "ds-key",
+              "expiresAt": null
+            }
+          },
+          "keys": [
+            "ARK_API_KEY",
+            "DEEPSEEK_API_KEY"
+          ],
+          "code": ""
+        }
+      }
+    },
+    {
+      "scenario": "http-error",
+      "label": "非 200 抛 vault-http",
+      "input": {
+        "status": 403,
+        "body": "permission denied",
+        "networkError": false
+      },
+      "expect": {
+        "code": "vault-http"
+      }
+    },
+    {
+      "scenario": "network-error",
+      "label": "网络异常抛 vault-network",
+      "input": {
+        "networkError": true
+      },
+      "expect": {
+        "code": "vault-network"
+      }
+    },
+    {
+      "scenario": "shape",
+      "label": "响应形状异常一律空表，不抛错",
+      "input": {
+        "bodies": [
+          "{\"data\":\"not-an-object\"}",
+          "{\"nodata\":1}",
+          "{\"data\":{\"data\":[\"a\"]}}"
+        ]
+      },
+      "expect": {
+        "results": [
+          {
+            "request": {
+              "sent": true,
+              "method": "GET",
+              "url": "http://127.0.0.1:8200/v1/secret/data/conatus/llm",
+              "contentType": null,
+              "token": "vault-token",
+              "target": null,
+              "hasSessionToken": false,
+              "contentSha256": null,
+              "amzDateFormat": false,
+              "authorization": {
+                "present": false
+              },
+              "body": ""
+            },
+            "snapshot": {},
+            "keys": [],
+            "code": ""
+          },
+          {
+            "request": {
+              "sent": true,
+              "method": "GET",
+              "url": "http://127.0.0.1:8200/v1/secret/data/conatus/llm",
+              "contentType": null,
+              "token": "vault-token",
+              "target": null,
+              "hasSessionToken": false,
+              "contentSha256": null,
+              "amzDateFormat": false,
+              "authorization": {
+                "present": false
+              },
+              "body": ""
+            },
+            "snapshot": {},
+            "keys": [],
+            "code": ""
+          },
+          {
+            "request": {
+              "sent": true,
+              "method": "GET",
+              "url": "http://127.0.0.1:8200/v1/secret/data/conatus/llm",
+              "contentType": null,
+              "token": "vault-token",
+              "target": null,
+              "hasSessionToken": false,
+              "contentSha256": null,
+              "amzDateFormat": false,
+              "authorization": {
+                "present": false
+              },
+              "body": ""
+            },
+            "snapshot": {},
+            "keys": [],
+            "code": ""
+          }
+        ]
+      }
+    },
+    {
+      "scenario": "read-only",
+      "label": "Vault 来源只读：update 抛 read-only",
+      "expect": {
+        "code": "read-only"
+      }
+    }
+  ]
+}

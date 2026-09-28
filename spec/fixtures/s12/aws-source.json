@@ -1,0 +1,341 @@
+{
+  "name": "aws-source",
+  "kind": "aws-source",
+  "cases": [
+    {
+      "scenario": "refresh",
+      "label": "POST / GetSecretValue + SigV4 头，SecretString 为 JSON 时展开",
+      "input": {
+        "status": 200,
+        "body": "{\"SecretString\":\"{\\\"ARK_API_KEY\\\":\\\"aws-key\\\",\\\"DEEPSEEK_API_KEY\\\":{\\\"value\\\":\\\"ds-key\\\"}}\"}",
+        "networkError": false
+      },
+      "expect": {
+        "result": {
+          "request": {
+            "sent": true,
+            "method": "POST",
+            "url": "https://secretsmanager.us-east-1.amazonaws.com/",
+            "contentType": "application/x-amz-json-1.1",
+            "token": null,
+            "target": "secretsmanager.GetSecretValue",
+            "hasSessionToken": false,
+            "contentSha256": "36865045941a72179e364e6572404e1419b03fe13d800fc97dd5fc68c12aa5ba",
+            "amzDateFormat": true,
+            "authorization": {
+              "present": true,
+              "parsed": true,
+              "algorithm": "AWS4-HMAC-SHA256",
+              "accessKey": "AKIDEXAMPLE",
+              "dateStampFormat": true,
+              "region": "us-east-1",
+              "service": "secretsmanager",
+              "scopeSuffix": "us-east-1/secretsmanager/aws4_request",
+              "signedHeaders": [
+                "content-type",
+                "host",
+                "x-amz-content-sha256",
+                "x-amz-date",
+                "x-amz-target"
+              ],
+              "signatureLength": 64
+            },
+            "body": "{\"SecretId\":\"conatus/llm\"}"
+          },
+          "snapshot": {
+            "ARK_API_KEY": {
+              "value": "aws-key",
+              "expiresAt": null
+            },
+            "DEEPSEEK_API_KEY": {
+              "value": "ds-key",
+              "expiresAt": null
+            }
+          },
+          "keys": [
+            "ARK_API_KEY",
+            "DEEPSEEK_API_KEY"
+          ],
+          "code": ""
+        }
+      }
+    },
+    {
+      "scenario": "refresh",
+      "label": "SecretString 为纯文本时以 secretId 为单一键",
+      "input": {
+        "status": 200,
+        "body": "{\"SecretString\": \"plain-secret\"}",
+        "networkError": false
+      },
+      "expect": {
+        "result": {
+          "request": {
+            "sent": true,
+            "method": "POST",
+            "url": "https://secretsmanager.us-east-1.amazonaws.com/",
+            "contentType": "application/x-amz-json-1.1",
+            "token": null,
+            "target": "secretsmanager.GetSecretValue",
+            "hasSessionToken": false,
+            "contentSha256": "36865045941a72179e364e6572404e1419b03fe13d800fc97dd5fc68c12aa5ba",
+            "amzDateFormat": true,
+            "authorization": {
+              "present": true,
+              "parsed": true,
+              "algorithm": "AWS4-HMAC-SHA256",
+              "accessKey": "AKIDEXAMPLE",
+              "dateStampFormat": true,
+              "region": "us-east-1",
+              "service": "secretsmanager",
+              "scopeSuffix": "us-east-1/secretsmanager/aws4_request",
+              "signedHeaders": [
+                "content-type",
+                "host",
+                "x-amz-content-sha256",
+                "x-amz-date",
+                "x-amz-target"
+              ],
+              "signatureLength": 64
+            },
+            "body": "{\"SecretId\":\"conatus/llm\"}"
+          },
+          "snapshot": {
+            "conatus/llm": {
+              "value": "plain-secret",
+              "expiresAt": null
+            }
+          },
+          "keys": [
+            "conatus/llm"
+          ],
+          "code": ""
+        }
+      }
+    },
+    {
+      "scenario": "refresh",
+      "label": "SecretString 非 JSON 时同样退化为单一键",
+      "input": {
+        "status": 200,
+        "body": "{\"SecretString\": \"not-json\"}",
+        "networkError": false
+      },
+      "expect": {
+        "result": {
+          "request": {
+            "sent": true,
+            "method": "POST",
+            "url": "https://secretsmanager.us-east-1.amazonaws.com/",
+            "contentType": "application/x-amz-json-1.1",
+            "token": null,
+            "target": "secretsmanager.GetSecretValue",
+            "hasSessionToken": false,
+            "contentSha256": "36865045941a72179e364e6572404e1419b03fe13d800fc97dd5fc68c12aa5ba",
+            "amzDateFormat": true,
+            "authorization": {
+              "present": true,
+              "parsed": true,
+              "algorithm": "AWS4-HMAC-SHA256",
+              "accessKey": "AKIDEXAMPLE",
+              "dateStampFormat": true,
+              "region": "us-east-1",
+              "service": "secretsmanager",
+              "scopeSuffix": "us-east-1/secretsmanager/aws4_request",
+              "signedHeaders": [
+                "content-type",
+                "host",
+                "x-amz-content-sha256",
+                "x-amz-date",
+                "x-amz-target"
+              ],
+              "signatureLength": 64
+            },
+            "body": "{\"SecretId\":\"conatus/llm\"}"
+          },
+          "snapshot": {
+            "conatus/llm": {
+              "value": "not-json",
+              "expiresAt": null
+            }
+          },
+          "keys": [
+            "conatus/llm"
+          ],
+          "code": ""
+        }
+      }
+    },
+    {
+      "scenario": "endpoint",
+      "label": "endpoint 覆盖 + 会话令牌进入签名与请求头",
+      "input": {
+        "status": 200,
+        "body": "{\"SecretString\": \"custom\"}",
+        "networkError": false,
+        "accessKey": "ASIAEXAMPLE",
+        "region": "eu-west-1",
+        "sessionToken": "SESSION",
+        "endpoint": "http://127.0.0.1:4566/"
+      },
+      "expect": {
+        "result": {
+          "request": {
+            "sent": true,
+            "method": "POST",
+            "url": "http://127.0.0.1:4566/",
+            "contentType": "application/x-amz-json-1.1",
+            "token": null,
+            "target": "secretsmanager.GetSecretValue",
+            "hasSessionToken": true,
+            "contentSha256": "36865045941a72179e364e6572404e1419b03fe13d800fc97dd5fc68c12aa5ba",
+            "amzDateFormat": true,
+            "authorization": {
+              "present": true,
+              "parsed": true,
+              "algorithm": "AWS4-HMAC-SHA256",
+              "accessKey": "ASIAEXAMPLE",
+              "dateStampFormat": true,
+              "region": "eu-west-1",
+              "service": "secretsmanager",
+              "scopeSuffix": "eu-west-1/secretsmanager/aws4_request",
+              "signedHeaders": [
+                "content-type",
+                "host",
+                "x-amz-content-sha256",
+                "x-amz-date",
+                "x-amz-security-token",
+                "x-amz-target"
+              ],
+              "signatureLength": 64
+            },
+            "body": "{\"SecretId\":\"conatus/llm\"}"
+          },
+          "snapshot": {
+            "conatus/llm": {
+              "value": "custom",
+              "expiresAt": null
+            }
+          },
+          "keys": [
+            "conatus/llm"
+          ],
+          "code": ""
+        }
+      }
+    },
+    {
+      "scenario": "http-error",
+      "label": "非 200 抛 aws-http",
+      "input": {
+        "status": 403,
+        "body": "denied",
+        "networkError": false
+      },
+      "expect": {
+        "code": "aws-http"
+      }
+    },
+    {
+      "scenario": "network-error",
+      "label": "网络异常抛 aws-network",
+      "input": {
+        "networkError": true
+      },
+      "expect": {
+        "code": "aws-network"
+      }
+    },
+    {
+      "scenario": "shape",
+      "label": "响应形状异常一律空表，不抛错",
+      "input": {
+        "bodies": [
+          "{\"SecretString\":42}",
+          "{\"nope\":\"x\"}"
+        ]
+      },
+      "expect": {
+        "results": [
+          {
+            "request": {
+              "sent": true,
+              "method": "POST",
+              "url": "https://secretsmanager.us-east-1.amazonaws.com/",
+              "contentType": "application/x-amz-json-1.1",
+              "token": null,
+              "target": "secretsmanager.GetSecretValue",
+              "hasSessionToken": false,
+              "contentSha256": "36865045941a72179e364e6572404e1419b03fe13d800fc97dd5fc68c12aa5ba",
+              "amzDateFormat": true,
+              "authorization": {
+                "present": true,
+                "parsed": true,
+                "algorithm": "AWS4-HMAC-SHA256",
+                "accessKey": "AKIDEXAMPLE",
+                "dateStampFormat": true,
+                "region": "us-east-1",
+                "service": "secretsmanager",
+                "scopeSuffix": "us-east-1/secretsmanager/aws4_request",
+                "signedHeaders": [
+                  "content-type",
+                  "host",
+                  "x-amz-content-sha256",
+                  "x-amz-date",
+                  "x-amz-target"
+                ],
+                "signatureLength": 64
+              },
+              "body": "{\"SecretId\":\"conatus/llm\"}"
+            },
+            "snapshot": {},
+            "keys": [],
+            "code": ""
+          },
+          {
+            "request": {
+              "sent": true,
+              "method": "POST",
+              "url": "https://secretsmanager.us-east-1.amazonaws.com/",
+              "contentType": "application/x-amz-json-1.1",
+              "token": null,
+              "target": "secretsmanager.GetSecretValue",
+              "hasSessionToken": false,
+              "contentSha256": "36865045941a72179e364e6572404e1419b03fe13d800fc97dd5fc68c12aa5ba",
+              "amzDateFormat": true,
+              "authorization": {
+                "present": true,
+                "parsed": true,
+                "algorithm": "AWS4-HMAC-SHA256",
+                "accessKey": "AKIDEXAMPLE",
+                "dateStampFormat": true,
+                "region": "us-east-1",
+                "service": "secretsmanager",
+                "scopeSuffix": "us-east-1/secretsmanager/aws4_request",
+                "signedHeaders": [
+                  "content-type",
+                  "host",
+                  "x-amz-content-sha256",
+                  "x-amz-date",
+                  "x-amz-target"
+                ],
+                "signatureLength": 64
+              },
+              "body": "{\"SecretId\":\"conatus/llm\"}"
+            },
+            "snapshot": {},
+            "keys": [],
+            "code": ""
+          }
+        ]
+      }
+    },
+    {
+      "scenario": "read-only",
+      "label": "AWS 来源只读：update 抛 read-only",
+      "expect": {
+        "code": "read-only"
+      }
+    }
+  ]
+}

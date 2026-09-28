@@ -1,0 +1,135 @@
+{
+  "name": "file-source",
+  "kind": "file-source",
+  "cases": [
+    {
+      "scenario": "load",
+      "label": "两种形态都读入，非法项跳过",
+      "input": {
+        "files": [
+          {
+            "name": "two-forms.json",
+            "content": "{\"ARK_API_KEY\":\"sk-file\",\"DEEPSEEK_API_KEY\":{\"value\":\"ds-file\",\"expiresAt\":\"2026-01-01T00:00:00Z\"},\"BAD_NUMBER\":42,\"BAD_OBJECT\":{\"noValue\":\"x\"}}"
+          }
+        ],
+        "fallback": null
+      },
+      "expect": {
+        "results": [
+          {
+            "file": "two-forms.json",
+            "snapshot": {
+              "ARK_API_KEY": {
+                "value": "sk-file",
+                "expiresAt": null
+              }
+            },
+            "keys": [
+              "ARK_API_KEY",
+              "DEEPSEEK_API_KEY"
+            ],
+            "thrown": ""
+          }
+        ]
+      }
+    },
+    {
+      "scenario": "load",
+      "label": "文件不存在用 fallback 兜底",
+      "input": {
+        "files": [
+          {
+            "name": "missing.json",
+            "content": null
+          }
+        ],
+        "fallback": {
+          "FALLBACK_KEY": "fallback-value"
+        }
+      },
+      "expect": {
+        "results": [
+          {
+            "file": "missing.json",
+            "snapshot": {
+              "FALLBACK_KEY": {
+                "value": "fallback-value",
+                "expiresAt": null
+              }
+            },
+            "keys": [
+              "FALLBACK_KEY"
+            ],
+            "thrown": ""
+          }
+        ]
+      }
+    },
+    {
+      "scenario": "load",
+      "label": "文件不存在且无 fallback 时快照为空",
+      "input": {
+        "files": [
+          {
+            "name": "missing.json",
+            "content": null
+          }
+        ],
+        "fallback": null
+      },
+      "expect": {
+        "results": [
+          {
+            "file": "missing.json",
+            "snapshot": {},
+            "keys": [],
+            "thrown": ""
+          }
+        ]
+      }
+    },
+    {
+      "scenario": "load",
+      "label": "非法 JSON 抛错；顶层非对象按空表处理",
+      "input": {
+        "files": [
+          {
+            "name": "broken.json",
+            "content": "{ 不是 JSON"
+          },
+          {
+            "name": "not-object.json",
+            "content": "[\"a\", \"b\"]"
+          }
+        ],
+        "fallback": null
+      },
+      "expect": {
+        "results": [
+          {
+            "file": "broken.json",
+            "snapshot": {},
+            "keys": [],
+            "thrown": "FormatException"
+          },
+          {
+            "file": "not-object.json",
+            "snapshot": {},
+            "keys": [],
+            "thrown": ""
+          }
+        ]
+      }
+    },
+    {
+      "scenario": "read-only",
+      "label": "文件来源只读：update 抛 read-only",
+      "input": {
+        "file": "two-forms.json"
+      },
+      "expect": {
+        "code": "read-only"
+      }
+    }
+  ]
+}

@@ -23,8 +23,8 @@ public protocol Credentials: AnyObject {
     /// 当前快照中的键。
     var keys: [String] { get }
 
-    /// 从底层来源重拉快照；默认无操作。
-    func refresh() async
+    /// 从底层来源重拉快照；默认无操作。远端来源可抛来源错误（规格 S12 §2）。
+    func refresh() async throws
 
     /// 释放来源；幂等。
     func close()
@@ -46,7 +46,7 @@ extension Credentials {
         throw CredentialsException(.missing, "缺少凭据：\(missing.joined(separator: ", "))")
     }
 
-    public func refresh() async {}
+    public func refresh() async throws {}
 }
 
 /// 'credentials' 服务键。

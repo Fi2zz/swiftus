@@ -1,0 +1,340 @@
+{
+  "name": "sign-normalization",
+  "kind": "sign",
+  "cases": [
+    {
+      "label": "查询串按整串排序：键大小写敏感、同键多值按值排序",
+      "request": {
+        "method": "GET",
+        "uri": "https://secretsmanager.us-east-1.amazonaws.com/?a=2&a=1&A=1&b=x%20y",
+        "headers": {
+          "Content-Type": "application/x-amz-json-1.1",
+          "X-Amz-Target": "secretsmanager.GetSecretValue"
+        },
+        "payload": "",
+        "timestamp": "2024-01-01T00:00:00.000Z"
+      },
+      "expect": {
+        "headers": {
+          "Authorization": "AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/20240101/us-east-1/secretsmanager/aws4_request, SignedHeaders=content-type;host;x-amz-content-sha256;x-amz-date;x-amz-target, Signature=fac52e324806aedc5f684eb81aef263b9e1a3c7be191096b4d33ce30dfc859c3",
+          "Content-Type": "application/x-amz-json-1.1",
+          "X-Amz-Content-Sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "X-Amz-Date": "20240101T000000Z",
+          "X-Amz-Target": "secretsmanager.GetSecretValue"
+        },
+        "authorization": {
+          "algorithm": "AWS4-HMAC-SHA256",
+          "accessKey": "AKIDEXAMPLE",
+          "scope": "20240101/us-east-1/secretsmanager/aws4_request",
+          "signedHeaders": [
+            "content-type",
+            "host",
+            "x-amz-content-sha256",
+            "x-amz-date",
+            "x-amz-target"
+          ],
+          "signature": "fac52e324806aedc5f684eb81aef263b9e1a3c7be191096b4d33ce30dfc859c3"
+        },
+        "hostInSignedHeaders": true,
+        "hasHostHeader": false
+      }
+    },
+    {
+      "label": "查询串解码 + 为空格、无值键取空串",
+      "request": {
+        "method": "GET",
+        "uri": "https://secretsmanager.us-east-1.amazonaws.com/?flag&b=c+d&e==f",
+        "headers": {
+          "Content-Type": "application/x-amz-json-1.1",
+          "X-Amz-Target": "secretsmanager.GetSecretValue"
+        },
+        "payload": "",
+        "timestamp": "2024-01-01T00:00:00.000Z"
+      },
+      "expect": {
+        "headers": {
+          "Authorization": "AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/20240101/us-east-1/secretsmanager/aws4_request, SignedHeaders=content-type;host;x-amz-content-sha256;x-amz-date;x-amz-target, Signature=e53761bb3b393f63e0f775d27b268b545d302d0b8e1545633b31d39fc116ce13",
+          "Content-Type": "application/x-amz-json-1.1",
+          "X-Amz-Content-Sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "X-Amz-Date": "20240101T000000Z",
+          "X-Amz-Target": "secretsmanager.GetSecretValue"
+        },
+        "authorization": {
+          "algorithm": "AWS4-HMAC-SHA256",
+          "accessKey": "AKIDEXAMPLE",
+          "scope": "20240101/us-east-1/secretsmanager/aws4_request",
+          "signedHeaders": [
+            "content-type",
+            "host",
+            "x-amz-content-sha256",
+            "x-amz-date",
+            "x-amz-target"
+          ],
+          "signature": "e53761bb3b393f63e0f775d27b268b545d302d0b8e1545633b31d39fc116ce13"
+        },
+        "hostInSignedHeaders": true,
+        "hasHostHeader": false
+      }
+    },
+    {
+      "label": "路径段解码再编码：空格不二次编码、加号按字面量",
+      "request": {
+        "method": "GET",
+        "uri": "https://secretsmanager.us-east-1.amazonaws.com/a%20b/c+d",
+        "headers": {
+          "Content-Type": "application/x-amz-json-1.1",
+          "X-Amz-Target": "secretsmanager.GetSecretValue"
+        },
+        "payload": "",
+        "timestamp": "2024-01-01T00:00:00.000Z"
+      },
+      "expect": {
+        "headers": {
+          "Authorization": "AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/20240101/us-east-1/secretsmanager/aws4_request, SignedHeaders=content-type;host;x-amz-content-sha256;x-amz-date;x-amz-target, Signature=1d2ef05bd9c35ac9cabe07b238eef4b39efe09b8372281f5e58cf2a46a7201b5",
+          "Content-Type": "application/x-amz-json-1.1",
+          "X-Amz-Content-Sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "X-Amz-Date": "20240101T000000Z",
+          "X-Amz-Target": "secretsmanager.GetSecretValue"
+        },
+        "authorization": {
+          "algorithm": "AWS4-HMAC-SHA256",
+          "accessKey": "AKIDEXAMPLE",
+          "scope": "20240101/us-east-1/secretsmanager/aws4_request",
+          "signedHeaders": [
+            "content-type",
+            "host",
+            "x-amz-content-sha256",
+            "x-amz-date",
+            "x-amz-target"
+          ],
+          "signature": "1d2ef05bd9c35ac9cabe07b238eef4b39efe09b8372281f5e58cf2a46a7201b5"
+        },
+        "hostInSignedHeaders": true,
+        "hasHostHeader": false
+      }
+    },
+    {
+      "label": "非 ASCII 路径段按 UTF-8 百分号编码",
+      "request": {
+        "method": "GET",
+        "uri": "https://secretsmanager.us-east-1.amazonaws.com/%E4%B8%AD%E6%96%87",
+        "headers": {
+          "Content-Type": "application/x-amz-json-1.1",
+          "X-Amz-Target": "secretsmanager.GetSecretValue"
+        },
+        "payload": "",
+        "timestamp": "2024-01-01T00:00:00.000Z"
+      },
+      "expect": {
+        "headers": {
+          "Authorization": "AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/20240101/us-east-1/secretsmanager/aws4_request, SignedHeaders=content-type;host;x-amz-content-sha256;x-amz-date;x-amz-target, Signature=a28b4b451ab63d347263ab4bbde8e23d1c212ad11acca2f8a9f2daafe2b1afb3",
+          "Content-Type": "application/x-amz-json-1.1",
+          "X-Amz-Content-Sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "X-Amz-Date": "20240101T000000Z",
+          "X-Amz-Target": "secretsmanager.GetSecretValue"
+        },
+        "authorization": {
+          "algorithm": "AWS4-HMAC-SHA256",
+          "accessKey": "AKIDEXAMPLE",
+          "scope": "20240101/us-east-1/secretsmanager/aws4_request",
+          "signedHeaders": [
+            "content-type",
+            "host",
+            "x-amz-content-sha256",
+            "x-amz-date",
+            "x-amz-target"
+          ],
+          "signature": "a28b4b451ab63d347263ab4bbde8e23d1c212ad11acca2f8a9f2daafe2b1afb3"
+        },
+        "hostInSignedHeaders": true,
+        "hasHostHeader": false
+      }
+    },
+    {
+      "label": "空段保留：尾斜杠与连续斜杠",
+      "request": {
+        "method": "GET",
+        "uri": "https://secretsmanager.us-east-1.amazonaws.com/a//b/",
+        "headers": {
+          "Content-Type": "application/x-amz-json-1.1",
+          "X-Amz-Target": "secretsmanager.GetSecretValue"
+        },
+        "payload": "",
+        "timestamp": "2024-01-01T00:00:00.000Z"
+      },
+      "expect": {
+        "headers": {
+          "Authorization": "AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/20240101/us-east-1/secretsmanager/aws4_request, SignedHeaders=content-type;host;x-amz-content-sha256;x-amz-date;x-amz-target, Signature=8ea5280411b69e4cd6d74b1d9f105d7396c56fb2a1b0aacdd76a4e0623c97551",
+          "Content-Type": "application/x-amz-json-1.1",
+          "X-Amz-Content-Sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "X-Amz-Date": "20240101T000000Z",
+          "X-Amz-Target": "secretsmanager.GetSecretValue"
+        },
+        "authorization": {
+          "algorithm": "AWS4-HMAC-SHA256",
+          "accessKey": "AKIDEXAMPLE",
+          "scope": "20240101/us-east-1/secretsmanager/aws4_request",
+          "signedHeaders": [
+            "content-type",
+            "host",
+            "x-amz-content-sha256",
+            "x-amz-date",
+            "x-amz-target"
+          ],
+          "signature": "8ea5280411b69e4cd6d74b1d9f105d7396c56fb2a1b0aacdd76a4e0623c97551"
+        },
+        "hostInSignedHeaders": true,
+        "hasHostHeader": false
+      }
+    },
+    {
+      "label": "无路径与根路径都规范为 /",
+      "request": {
+        "method": "GET",
+        "uri": "https://secretsmanager.us-east-1.amazonaws.com",
+        "headers": {
+          "Content-Type": "application/x-amz-json-1.1",
+          "X-Amz-Target": "secretsmanager.GetSecretValue"
+        },
+        "payload": "",
+        "timestamp": "2024-01-01T00:00:00.000Z"
+      },
+      "expect": {
+        "headers": {
+          "Authorization": "AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/20240101/us-east-1/secretsmanager/aws4_request, SignedHeaders=content-type;host;x-amz-content-sha256;x-amz-date;x-amz-target, Signature=fed7103760de56b85584489cdf3f31ee1da052ec42c210539b8d0f9bf13fb9e1",
+          "Content-Type": "application/x-amz-json-1.1",
+          "X-Amz-Content-Sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "X-Amz-Date": "20240101T000000Z",
+          "X-Amz-Target": "secretsmanager.GetSecretValue"
+        },
+        "authorization": {
+          "algorithm": "AWS4-HMAC-SHA256",
+          "accessKey": "AKIDEXAMPLE",
+          "scope": "20240101/us-east-1/secretsmanager/aws4_request",
+          "signedHeaders": [
+            "content-type",
+            "host",
+            "x-amz-content-sha256",
+            "x-amz-date",
+            "x-amz-target"
+          ],
+          "signature": "fed7103760de56b85584489cdf3f31ee1da052ec42c210539b8d0f9bf13fb9e1"
+        },
+        "hostInSignedHeaders": true,
+        "hasHostHeader": false
+      }
+    },
+    {
+      "label": "头值去首尾空白参与签名",
+      "request": {
+        "method": "POST",
+        "uri": "https://secretsmanager.us-east-1.amazonaws.com/",
+        "headers": {
+          "Content-Type": "  application/x-amz-json-1.1  ",
+          "X-Amz-Target": "secretsmanager.GetSecretValue"
+        },
+        "payload": "{\"SecretId\": \"conatus/llm\"}",
+        "timestamp": "2024-01-01T00:00:00.000Z"
+      },
+      "expect": {
+        "headers": {
+          "Authorization": "AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/20240101/us-east-1/secretsmanager/aws4_request, SignedHeaders=content-type;host;x-amz-content-sha256;x-amz-date;x-amz-target, Signature=d38ab2c13c5fb2ba790a04f28dfd22c1b38df0536c544eec9b554d2f4bd24c8c",
+          "Content-Type": "  application/x-amz-json-1.1  ",
+          "X-Amz-Content-Sha256": "228753a20b1780875a944535bdd95ab3b22aea51f34dbaeecc40af0ec7f1adb9",
+          "X-Amz-Date": "20240101T000000Z",
+          "X-Amz-Target": "secretsmanager.GetSecretValue"
+        },
+        "authorization": {
+          "algorithm": "AWS4-HMAC-SHA256",
+          "accessKey": "AKIDEXAMPLE",
+          "scope": "20240101/us-east-1/secretsmanager/aws4_request",
+          "signedHeaders": [
+            "content-type",
+            "host",
+            "x-amz-content-sha256",
+            "x-amz-date",
+            "x-amz-target"
+          ],
+          "signature": "d38ab2c13c5fb2ba790a04f28dfd22c1b38df0536c544eec9b554d2f4bd24c8c"
+        },
+        "hostInSignedHeaders": true,
+        "hasHostHeader": false
+      }
+    },
+    {
+      "label": "系统头覆盖同名业务头",
+      "request": {
+        "method": "POST",
+        "uri": "https://secretsmanager.us-east-1.amazonaws.com/",
+        "headers": {
+          "Content-Type": "application/x-amz-json-1.1",
+          "X-Amz-Date": "19990101T000000Z",
+          "X-Amz-Target": "secretsmanager.GetSecretValue"
+        },
+        "payload": "{\"SecretId\": \"conatus/llm\"}",
+        "timestamp": "2024-01-01T00:00:00.000Z"
+      },
+      "expect": {
+        "headers": {
+          "Authorization": "AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/20240101/us-east-1/secretsmanager/aws4_request, SignedHeaders=content-type;host;x-amz-content-sha256;x-amz-date;x-amz-target, Signature=d38ab2c13c5fb2ba790a04f28dfd22c1b38df0536c544eec9b554d2f4bd24c8c",
+          "Content-Type": "application/x-amz-json-1.1",
+          "X-Amz-Content-Sha256": "228753a20b1780875a944535bdd95ab3b22aea51f34dbaeecc40af0ec7f1adb9",
+          "X-Amz-Date": "20240101T000000Z",
+          "X-Amz-Target": "secretsmanager.GetSecretValue"
+        },
+        "authorization": {
+          "algorithm": "AWS4-HMAC-SHA256",
+          "accessKey": "AKIDEXAMPLE",
+          "scope": "20240101/us-east-1/secretsmanager/aws4_request",
+          "signedHeaders": [
+            "content-type",
+            "host",
+            "x-amz-content-sha256",
+            "x-amz-date",
+            "x-amz-target"
+          ],
+          "signature": "d38ab2c13c5fb2ba790a04f28dfd22c1b38df0536c544eec9b554d2f4bd24c8c"
+        },
+        "hostInSignedHeaders": true,
+        "hasHostHeader": false
+      }
+    },
+    {
+      "label": "方法原样参与签名（小写不规范化）",
+      "request": {
+        "method": "post",
+        "uri": "https://secretsmanager.us-east-1.amazonaws.com/",
+        "headers": {
+          "Content-Type": "application/x-amz-json-1.1",
+          "X-Amz-Target": "secretsmanager.GetSecretValue"
+        },
+        "payload": "{\"SecretId\": \"conatus/llm\"}",
+        "timestamp": "2024-01-01T00:00:00.000Z"
+      },
+      "expect": {
+        "headers": {
+          "Authorization": "AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/20240101/us-east-1/secretsmanager/aws4_request, SignedHeaders=content-type;host;x-amz-content-sha256;x-amz-date;x-amz-target, Signature=f8cbb30cfe388a2a6e9662bfeb820f596e81443dbe3b98be9f6beda82ed82dc1",
+          "Content-Type": "application/x-amz-json-1.1",
+          "X-Amz-Content-Sha256": "228753a20b1780875a944535bdd95ab3b22aea51f34dbaeecc40af0ec7f1adb9",
+          "X-Amz-Date": "20240101T000000Z",
+          "X-Amz-Target": "secretsmanager.GetSecretValue"
+        },
+        "authorization": {
+          "algorithm": "AWS4-HMAC-SHA256",
+          "accessKey": "AKIDEXAMPLE",
+          "scope": "20240101/us-east-1/secretsmanager/aws4_request",
+          "signedHeaders": [
+            "content-type",
+            "host",
+            "x-amz-content-sha256",
+            "x-amz-date",
+            "x-amz-target"
+          ],
+          "signature": "f8cbb30cfe388a2a6e9662bfeb820f596e81443dbe3b98be9f6beda82ed82dc1"
+        },
+        "hostInSignedHeaders": true,
+        "hasHostHeader": false
+      }
+    }
+  ]
+}
