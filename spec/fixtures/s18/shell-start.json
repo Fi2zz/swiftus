@@ -1,0 +1,33 @@
+{
+  "name": "shell-start",
+  "kind": "shell-start",
+  "cases": [
+    {
+      "scenario": "echo",
+      "label": "后台进程：done 落定后增量读完，第二次读为空",
+      "input": {
+        "command": "echo ready"
+      },
+      "expect": {
+        "status": "completed",
+        "exitCode": 0,
+        "delta": "ready\n",
+        "secondDeltaEmpty": true,
+        "killAfterDone": false
+      }
+    },
+    {
+      "scenario": "kill",
+      "label": "后台进程：kill 后状态转 killed、退出码为负、重复 kill 返回 false",
+      "input": {
+        "command": "sleep 30"
+      },
+      "expect": {
+        "firstKill": true,
+        "status": "killed",
+        "exitCodeIsNegative": true,
+        "secondKill": false
+      }
+    }
+  ]
+}

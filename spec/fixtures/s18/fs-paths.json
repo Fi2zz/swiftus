@@ -1,0 +1,90 @@
+{
+  "name": "fs-paths",
+  "kind": "fs-paths",
+  "root": "<root>",
+  "cases": [
+    {
+      "label": "绝对路径原样保留",
+      "expect": {
+        "displayPath": "<root>/paths/existing.txt"
+      }
+    },
+    {
+      "label": "相对路径以 cwd 为基准",
+      "expect": {
+        "displayPath": "<root>/paths/existing.txt"
+      }
+    },
+    {
+      "label": "cwd 覆盖实例基准",
+      "expect": {
+        "displayPath": "<root>/paths/existing.txt"
+      }
+    },
+    {
+      "label": "点段与父段被消解",
+      "expect": {
+        "displayPath": "<root>/paths/existing.txt"
+      }
+    },
+    {
+      "label": "尾部分隔符被消解",
+      "expect": {
+        "displayPath": "<root>/paths"
+      }
+    },
+    {
+      "label": "反斜杠也作分隔符",
+      "expect": {
+        "displayPath": "<root>/paths/existing.txt"
+      }
+    },
+    {
+      "label": "空路径抛 notFound",
+      "expect": {
+        "error": "FS_NOT_FOUND"
+      }
+    },
+    {
+      "label": "同一文件的别名共享身份键（符号链接 / 点段 / 父段）",
+      "expect": {
+        "aliasKeyEqualsDirect": true,
+        "dotKeyEqualsDirect": true,
+        "dotDotKeyEqualsDirect": true,
+        "aliasDisplayDiffers": true
+      }
+    },
+    {
+      "label": "不存在的目标：父目录已存在时键为「真实父路径 + basename」，父目录缺失时退回展示路径",
+      "expect": {
+        "parentExists_keyEqualsDisplayPath": true,
+        "parentMissing_keyEqualsDisplayPath": true,
+        "keyChangesWhenParentAppears": false
+      }
+    },
+    {
+      "label": "contains：自身与同一文件（别名）算包含、子孙算包含",
+      "expect": {
+        "self": true,
+        "child": true,
+        "sameFileViaAlias": true,
+        "parentIsNotChild": false
+      }
+    },
+    {
+      "label": "processPath 与 fileUrl 形态",
+      "expect": {
+        "processPath": "<root>/paths/existing.txt",
+        "fileUrlStartsWithFile": true
+      }
+    },
+    {
+      "label": "lstat 不跟随最后一段符号链接（stat 则跟随）",
+      "expect": {
+        "lstatType": "symlink",
+        "statType": "file",
+        "lstatSize": 5
+      }
+    }
+  ]
+}

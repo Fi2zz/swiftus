@@ -1,0 +1,98 @@
+{
+  "name": "shell-run",
+  "kind": "shell-run",
+  "cases": [
+    {
+      "label": "正常退出：退出码与输出",
+      "input": {
+        "command": "echo hello"
+      },
+      "expect": {
+        "exitCode": 0,
+        "timedOut": false,
+        "timeoutMs": 2000,
+        "stdout": "hello\n",
+        "stdoutTruncated": false,
+        "stderr": "",
+        "stderrTruncated": false
+      }
+    },
+    {
+      "label": "非零退出照常返回（不 reject）",
+      "input": {
+        "command": "exit 3"
+      },
+      "expect": {
+        "exitCode": 3,
+        "timedOut": false,
+        "timeoutMs": 2000,
+        "stdout": "",
+        "stdoutTruncated": false,
+        "stderr": "",
+        "stderrTruncated": false
+      }
+    },
+    {
+      "label": "stderr 单独采集",
+      "input": {
+        "command": "echo oops >&2"
+      },
+      "expect": {
+        "exitCode": 0,
+        "timedOut": false,
+        "timeoutMs": 2000,
+        "stdout": "",
+        "stdoutTruncated": false,
+        "stderr": "oops\n",
+        "stderrTruncated": false
+      }
+    },
+    {
+      "label": "stdin 写入后关闭",
+      "input": {
+        "command": "cat",
+        "stdin": "喂你\n"
+      },
+      "expect": {
+        "exitCode": 0,
+        "timedOut": false,
+        "timeoutMs": 2000,
+        "stdout": "喂你\n",
+        "stdoutTruncated": false,
+        "stderr": "",
+        "stderrTruncated": false
+      }
+    },
+    {
+      "label": "超时中断：timedOut 为真且退出码为负",
+      "input": {
+        "command": "sleep 5",
+        "timeoutMs": 300
+      },
+      "expect": {
+        "exitCode": -9,
+        "timedOut": true,
+        "timeoutMs": 300,
+        "stdout": "",
+        "stdoutTruncated": false,
+        "stderr": "",
+        "stderrTruncated": false
+      }
+    },
+    {
+      "label": "采集上限截断：超出部分置 truncated",
+      "input": {
+        "command": "head -c 2000 /dev/zero | tr \"\\0\" \"a\""
+      },
+      "expect": {
+        "exitCode": 0,
+        "timedOut": false,
+        "timeoutMs": 2000,
+        "stdout": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "stdoutTruncated": true,
+        "stderr": "",
+        "stderrTruncated": false
+      }
+    }
+  ]
+}

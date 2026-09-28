@@ -1,0 +1,214 @@
+{
+  "name": "fs-ops",
+  "kind": "fs-ops",
+  "root": "<root>",
+  "cases": [
+    {
+      "scenario": "read",
+      "label": "stat 元数据 + readText 的类型化错误码",
+      "input": {
+        "files": [
+          {
+            "name": "ops/read.txt",
+            "content": "你好\nworld\n"
+          },
+          {
+            "name": "ops/binary.bin",
+            "content": "<binary>"
+          },
+          {
+            "name": "ops/sub/inner.txt",
+            "content": "x"
+          }
+        ]
+      },
+      "expect": {
+        "probes": [
+          {
+            "path": "<root>/ops/read.txt",
+            "exists": true,
+            "type": "file",
+            "size": 13,
+            "read": "你好\nworld\n"
+          },
+          {
+            "path": "<root>/ops/binary.bin",
+            "exists": true,
+            "type": "file",
+            "size": 3,
+            "read": {
+              "error": "FS_NOT_TEXT"
+            }
+          },
+          {
+            "path": "<root>/ops/sub",
+            "exists": true,
+            "type": "directory",
+            "size": null,
+            "read": {
+              "error": "FS_NOT_REGULAR_FILE"
+            }
+          },
+          {
+            "path": "<root>/ops/ghost.txt",
+            "exists": false,
+            "type": null,
+            "size": null,
+            "read": {
+              "error": "FS_NOT_FOUND"
+            }
+          }
+        ],
+        "textFile": "你好\nworld\n",
+        "subdirKept": true
+      }
+    },
+    {
+      "scenario": "write",
+      "label": "writeText：父目录递归创建、operation 区分新建/覆盖、before 为旧内容",
+      "input": {
+        "target": "ops/new/deep/file.txt"
+      },
+      "expect": {
+        "created": {
+          "operation": "create",
+          "before": null,
+          "after": "第一版",
+          "contentOnDisk": "第二版",
+          "versionChanged": true,
+          "tempLeftovers": 0
+        },
+        "updated": {
+          "operation": "update",
+          "before": "第一版",
+          "after": "第二版",
+          "contentOnDisk": "第二版"
+        },
+        "writeToDirectory": {
+          "error": "FS_NOT_REGULAR_FILE"
+        }
+      }
+    },
+    {
+      "scenario": "guard",
+      "label": "写入守卫：已存在拒无条件覆盖、版本不符拒替换、版本相符放行",
+      "input": {
+        "target": "ops/guard.txt"
+      },
+      "expect": {
+        "createIfAbsentOnExisting": {
+          "error": "FS_NOT_OBSERVED"
+        },
+        "staleVersion": {
+          "error": "FS_STALE_VERSION"
+        },
+        "replaceWithCurrentVersion": {
+          "operation": "update",
+          "after": "v4",
+          "contentOnDisk": "v4"
+        },
+        "replaceOnMissing": {
+          "error": "FS_STALE_VERSION"
+        }
+      }
+    },
+    {
+      "scenario": "edit",
+      "label": "editText：未命中 / 歧义 / replaceAll / 版本守卫 / 目标缺失",
+      "input": {
+        "target": "ops/edit.txt",
+        "content": "alpha\nbeta\nalpha\n"
+      },
+      "expect": {
+        "notFound": {
+          "error": "FS_EDIT_NOT_FOUND"
+        },
+        "ambiguous": {
+          "error": "FS_AMBIGUOUS_EDIT"
+        },
+        "replaceAll": {
+          "before": "alpha\nbeta\nalpha\n",
+          "after": "A\nbeta\nA\n",
+          "contentOnDisk": "A\nB\nA\n"
+        },
+        "staleVersion": {
+          "error": "FS_STALE_VERSION"
+        },
+        "freshVersion": {
+          "before": "A\nbeta\nA\n",
+          "after": "A\nB\nA\n",
+          "contentOnDisk": "A\nB\nA\n"
+        },
+        "missingTarget": {
+          "error": "FS_STALE_VERSION"
+        }
+      }
+    },
+    {
+      "scenario": "list",
+      "label": "listDir：按名排序、只给元数据、非目录报 notDirectory",
+      "input": {
+        "files": [
+          {
+            "name": "ops/list/b.txt",
+            "content": "bb"
+          },
+          {
+            "name": "ops/list/a.txt",
+            "content": "a"
+          },
+          {
+            "name": "ops/list/nested/c.txt",
+            "content": "ccc"
+          }
+        ]
+      },
+      "expect": {
+        "entries": [
+          {
+            "name": "a.txt",
+            "type": "file",
+            "size": 1,
+            "displayPath": "<root>/ops/list/a.txt"
+          },
+          {
+            "name": "b.txt",
+            "type": "file",
+            "size": 2,
+            "displayPath": "<root>/ops/list/b.txt"
+          },
+          {
+            "name": "nested",
+            "type": "directory",
+            "size": null,
+            "displayPath": "<root>/ops/list/nested"
+          }
+        ],
+        "listFile": {
+          "error": "FS_NOT_DIRECTORY"
+        }
+      }
+    },
+    {
+      "scenario": "remove",
+      "label": "remove：删文件、递归删目录、缺失静默",
+      "input": {
+        "files": [
+          {
+            "name": "ops/remove/file.txt",
+            "content": "x"
+          },
+          {
+            "name": "ops/remove/tree/deep/file.txt",
+            "content": "y"
+          }
+        ]
+      },
+      "expect": {
+        "fileGone": true,
+        "treeGone": true,
+        "removeMissing": "silent"
+      }
+    }
+  ]
+}

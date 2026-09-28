@@ -1,0 +1,53 @@
+{
+  "name": "shell-resolve",
+  "kind": "shell-resolve",
+  "root": "<root>",
+  "cases": [
+    {
+      "label": "缺省补齐：实例默认超时与采集上限、实例 cwd",
+      "expect": {
+        "command": "echo hi",
+        "workdir": "<root>",
+        "timeoutMs": 120000,
+        "stdoutMaxBytes": 64000,
+        "hasStdin": false,
+        "env": null
+      }
+    },
+    {
+      "label": "请求值优先于实例默认",
+      "expect": {
+        "command": "echo hi",
+        "workdir": "<root>",
+        "timeoutMs": 5000,
+        "stdoutMaxBytes": 128,
+        "hasStdin": false,
+        "env": null
+      }
+    },
+    {
+      "label": "超时封顶到 maxTimeoutMs",
+      "expect": {
+        "command": "echo hi",
+        "workdir": "<root>",
+        "timeoutMs": 600000,
+        "stdoutMaxBytes": 64000,
+        "hasStdin": false,
+        "env": null
+      }
+    },
+    {
+      "label": "workdir 覆盖、stdin 与 env 透传",
+      "expect": {
+        "command": "cat",
+        "workdir": "/tmp",
+        "timeoutMs": 120000,
+        "stdoutMaxBytes": 64000,
+        "hasStdin": true,
+        "env": {
+          "K": "V"
+        }
+      }
+    }
+  ]
+}
