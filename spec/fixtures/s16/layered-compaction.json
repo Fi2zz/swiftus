@@ -1,0 +1,20 @@
+{
+  "name": "layered-compaction",
+  "kind": "layered-compaction",
+  "expect": {
+    "summary": "[历史摘要]\n- 早期对话要点\n\n[用户偏好]\n- 记住我喜欢清淡饮食\n\n[工具结果]\n- 工具 search：很长的搜索结果正文第一行（原结果 19 字符，完整内容见会话日志中的 tool/result 事件）\n\n[保留原文]\n-",
+    "shadowedSeqs": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "kept": 1,
+    "invariantViolations": []
+  }
+}

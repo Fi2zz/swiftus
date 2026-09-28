@@ -5,6 +5,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:conatus_agent/conatus_agent.dart';
+import 'package:conatus_compaction/conatus_compaction.dart';
+import 'package:conatus_core/conatus_core.dart';
 import 'package:conatus_foundation/conatus_foundation.dart';
 import 'package:conatus_llm/conatus_llm.dart';
 
@@ -17,6 +19,10 @@ Future<void> main() async {
     'reflection': _reflection,
     'router-flow': _routerFlow,
     'planning-phase': _planningPhase,
+    'telemetry-flow': _telemetryFlow,
+    'caching': () async => _caching(),
+    'layered-compaction': _layeredCompaction,
+    'eval': _eval,
   };
   const JsonEncoder encoder = JsonEncoder.withIndent('  ');
   for (final MapEntry<String, Future<Map<String, Object?>> Function()> entry
@@ -375,4 +381,227 @@ class _FixedRouter implements Router {
 
   @override
   Future<RouteDecision> route(String input) async => decision;
+}
+
+// ═══════════════════════ v1.1 增补：观测与缓存 ═══════════════════════
+
+/// telemetry-flow：instrumentTools + TelemetryLlmProvider + AgentLoop onEvent
+/// 的端到端事件序列（ms 字段由运行器断言「存在且非负」，不比具体值）。
+Future<Map<String, Object?>> _telemetryFlow() async {
+  final Context ctx = Context.root();
+  final InMemoryTelemetry telemetry = InMemoryTelemetry();
+  provideTelemetry(ctx, telemetry: telemetry);
+  final ToolRegistry tools = ToolRegistry()..register(_TimeTool());
+  provideTools(ctx, tools: tools);
+  instrumentTools(ctx);
+  final _ScriptedProvider scripted = _ScriptedProvider(<LlmResult>[
+    LlmResult(content: '', provider: 'scripted', model: 'm', toolCalls: <LlmToolCall>[
+      LlmToolCall(id: 'c1', name: 'get_time'),
+    ]),
+    _text('12:00'),
+  ]);
+  final AgentLoop loop = AgentLoop(
+    llm: TelemetryLlmProvider(scripted, telemetry: telemetry),
+    tools: tools,
+    onEvent: (String type, Map<String, Object?> data) =>
+        telemetry.emit(TelemetryEvent(type, data: data)),
+  );
+  await loop.run('现在几点');
+  final Map<String, Object?> flow = <String, Object?>{
+    'name': 'telemetry-flow',
+    'kind': 'telemetry-flow',
+    'expect': <String, Object?>{
+      'events': <Object?>[
+        for (final TelemetryEvent event in telemetry.recent)
+          <String, Object?>{'name': event.name, 'data': event.data},
+      ],
+    },
+  };
+  ctx.dispose();
+  return flow;
+}
+
+/// caching：CachePlan 前缀性质 + recordHit 判定 + CachingLlmProvider 透传。
+Map<String, Object?> _caching() {
+  LlmMessage cached(String text) =>
+      LlmMessage('system', text, cacheable: true);
+  final CachePlan truncated = CachePlan.of(<LlmMessage>[
+    cached('稳定前缀'),
+    LlmMessage('user', '不可缓存'),
+    cached('不再计入'),
+  ]);
+  final CachePlan planA = CachePlan.of(<LlmMessage>[cached('前缀A')]);
+  final CachePlan planA2 = CachePlan.of(<LlmMessage>[cached('前缀A')]);
+  final CachePlan planB = CachePlan.of(<LlmMessage>[cached('前缀B')]);
+  final List<Map<String, Object?>> hitCases = <Map<String, Object?>>[];
+  for (final Map<String, Object?> usage in <Map<String, Object?>>[
+    <String, Object?>{'prompt_cache_hit_tokens': 5},
+    <String, Object?>{'cache_hit_tokens': 0},
+    <String, Object?>{
+      'prompt_tokens_details': <String, Object?>{'cached_tokens': 3}
+    },
+    <String, Object?>{},
+  ]) {
+    final ContextCache cache = ContextCache();
+    cache.recordHit(plan: planA, usage: usage);
+    hitCases.add(<String, Object?>{
+      'usage': usage,
+      'expect': <String, Object?>{'hit': cache.hits == 1},
+    });
+  }
+  final _ScriptedProvider scripted = _ScriptedProvider(<LlmResult>[
+    LlmResult(content: '好', provider: 'scripted', model: 'm',
+        usage: <String, dynamic>{'prompt_cache_hit_tokens': 3}),
+  ]);
+  return <String, Object?>{
+    'name': 'caching',
+    'kind': 'caching',
+    'planCases': <Object?>[
+      <String, Object?>{
+        'label': '连续前缀遇不可缓存即停',
+        'expect': <String, Object?>{
+          'cacheableMessages': truncated.cacheableMessages,
+          'cacheableChars': truncated.cacheableChars,
+          'empty': truncated.empty,
+        },
+      },
+      <String, Object?>{
+        'label': '同内容同指纹',
+        'expect': <String, Object?>{'same': planA.cacheKey == planA2.cacheKey},
+      },
+      <String, Object?>{
+        'label': '前缀变则指纹变',
+        'expect': <String, Object?>{'same': planA.cacheKey == planB.cacheKey},
+      },
+    ],
+    'hitCases': hitCases,
+    'passthrough': <String, Object?>{'usage': <String, Object?>{'prompt_cache_hit_tokens': 3}},
+  };
+}
+
+/// layered-compaction：分层折叠端到端快照。
+Future<Map<String, Object?>> _layeredCompaction() async {
+  final Session session = Session(id: 's1');
+  void user(String text) =>
+      session.append(kUserMessageEvent, data: <String, Object?>{'text': text});
+  user('记住我喜欢清淡饮食');
+  for (int i = 0; i < 6; i++) {
+    user('早期闲聊第${i}条');
+  }
+  session.append(kAssistantMessageEvent, data: <String, Object?>{
+    'text': '',
+    'toolCalls': <Map<String, Object?>>[
+      <String, Object?>{'id': 'c1', 'name': 'search', 'arguments': '{}'},
+    ],
+  });
+  session.append(kToolResultEvent, data: <String, Object?>{
+    'callId': 'c1',
+    'name': 'search',
+    'content': '很长的搜索结果正文第一行\n其余部分省略',
+  });
+  user('今天吃什么');
+  final LayeredCompactor compactor = LayeredCompactor(
+    keepRecent: 1,
+    classifier: RuleBasedContentClassifier(recentWindow: 2),
+  );
+  final CompactionResult? result = await compactor.compactIfNeeded(
+    session,
+    (List<SessionEvent> events, String previous) async =>
+        CompactionSummary(events.isEmpty ? '（无早期对话）' : '早期对话要点',
+            provider: 'scripted', model: 'm'),
+  );
+  return <String, Object?>{
+    'name': 'layered-compaction',
+    'kind': 'layered-compaction',
+    'expect': <String, Object?>{
+      'summary': result?.summary,
+      'shadowedSeqs': result?.shadowedSeqs,
+      'kept': result?.kept,
+      'invariantViolations': checkCompactionInvariant(session.events),
+    },
+  };
+}
+
+/// eval：默认判分矩阵 + Evaluator 汇总 + 基线对比。
+Future<Map<String, Object?>> _eval() async {
+  final EvalCase caseA = const EvalCase(
+    id: 'a',
+    input: '现在几点',
+    expectedTools: <String>['get_time'],
+    expectedOutput: '12:00',
+    maxRounds: 2,
+  );
+  final EvalResult passResult = const EvalResult(
+    caseId: 'a',
+    passed: false,
+    actualTools: <String>['get_time'],
+    actualOutput: '12:00',
+    rounds: 1,
+    duration: Duration.zero,
+  );
+  final EvalResult failResult = const EvalResult(
+    caseId: 'a',
+    passed: false,
+    actualTools: <String>[],
+    actualOutput: '不知道',
+    rounds: 3,
+    duration: Duration.zero,
+  );
+  final List<Map<String, Object?>> judgeCases = <Map<String, Object?>>[
+    <String, Object?>{
+      'label': '全中通过',
+      'expect': defaultEvalJudge(caseA, passResult),
+    },
+    <String, Object?>{
+      'label': '工具缺失/输出不符/超步数均不通过',
+      'expect': defaultEvalJudge(caseA, failResult),
+    },
+  ];
+
+  final _ScriptedProvider scripted = _ScriptedProvider(<LlmResult>[
+    LlmResult(content: '', provider: 'scripted', model: 'm', toolCalls: <LlmToolCall>[
+      LlmToolCall(id: 'c1', name: 'get_time'),
+    ]),
+    _text('12:00'),
+  ]);
+  final AgentLoop loop = AgentLoop(
+    llm: scripted,
+    tools: ToolRegistry()..register(_TimeTool()),
+  );
+  final Evaluator evaluator = Evaluator(run: (String input) => loop.run(input));
+  final EvalReport report = await evaluator.runAll(<EvalCase>[
+    caseA,
+    const EvalCase(id: 'b', input: '你好', expectedOutput: '12:00'),
+  ]);
+  final EvalReport baseline = EvalReport(const <EvalResult>[
+    EvalResult(
+      caseId: 'a',
+      passed: true,
+      actualTools: <String>['get_time'],
+      actualOutput: '12:00',
+      rounds: 1,
+      duration: Duration.zero,
+    ),
+  ]);
+  return <String, Object?>{
+    'name': 'eval',
+    'kind': 'eval',
+    'judgeCases': judgeCases,
+    'expect': <String, Object?>{
+      'results': <Object?>[
+        for (final EvalResult r in report.results)
+          <String, Object?>{
+            'caseId': r.caseId,
+            'passed': r.passed,
+            'actualTools': r.actualTools,
+            'actualOutput': r.actualOutput,
+            'rounds': r.rounds,
+          },
+      ],
+      'passedCount': report.passedCount,
+      'passRate': report.passRate,
+      'averageRounds': report.averageRounds,
+      'diffText': report.compareTo(baseline).toString(),
+    },
+  };
 }

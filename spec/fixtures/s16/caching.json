@@ -1,0 +1,65 @@
+{
+  "name": "caching",
+  "kind": "caching",
+  "planCases": [
+    {
+      "label": "连续前缀遇不可缓存即停",
+      "expect": {
+        "cacheableMessages": 1,
+        "cacheableChars": 4,
+        "empty": false
+      }
+    },
+    {
+      "label": "同内容同指纹",
+      "expect": {
+        "same": true
+      }
+    },
+    {
+      "label": "前缀变则指纹变",
+      "expect": {
+        "same": false
+      }
+    }
+  ],
+  "hitCases": [
+    {
+      "usage": {
+        "prompt_cache_hit_tokens": 5
+      },
+      "expect": {
+        "hit": true
+      }
+    },
+    {
+      "usage": {
+        "cache_hit_tokens": 0
+      },
+      "expect": {
+        "hit": false
+      }
+    },
+    {
+      "usage": {
+        "prompt_tokens_details": {
+          "cached_tokens": 3
+        }
+      },
+      "expect": {
+        "hit": true
+      }
+    },
+    {
+      "usage": {},
+      "expect": {
+        "hit": false
+      }
+    }
+  ],
+  "passthrough": {
+    "usage": {
+      "prompt_cache_hit_tokens": 3
+    }
+  }
+}

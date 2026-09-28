@@ -1,0 +1,38 @@
+{
+  "name": "eval",
+  "kind": "eval",
+  "judgeCases": [
+    {
+      "label": "全中通过",
+      "expect": true
+    },
+    {
+      "label": "工具缺失/输出不符/超步数均不通过",
+      "expect": false
+    }
+  ],
+  "expect": {
+    "results": [
+      {
+        "caseId": "a",
+        "passed": true,
+        "actualTools": [
+          "get_time"
+        ],
+        "actualOutput": "12:00",
+        "rounds": 1
+      },
+      {
+        "caseId": "b",
+        "passed": true,
+        "actualTools": [],
+        "actualOutput": "12:00",
+        "rounds": 0
+      }
+    ],
+    "passedCount": 2,
+    "passRate": 1.0,
+    "averageRounds": 0.5,
+    "diffText": "通过率 +0.0%，平均步数 -0.5"
+  }
+}
