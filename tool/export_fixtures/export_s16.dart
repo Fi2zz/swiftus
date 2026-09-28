@@ -23,6 +23,9 @@ Future<void> main() async {
     'caching': () async => _caching(),
     'layered-compaction': _layeredCompaction,
     'eval': _eval,
+    'approval-flow': _approvalFlow,
+    'sub-agent': _subAgent,
+    'recovery': _recovery,
   };
   const JsonEncoder encoder = JsonEncoder.withIndent('  ');
   for (final MapEntry<String, Future<Map<String, Object?>> Function()> entry
@@ -604,4 +607,195 @@ Future<Map<String, Object?>> _eval() async {
       'diffText': report.compareTo(baseline).toString(),
     },
   };
+}
+
+// ═══════════════════════ v1.2 增补：执行安全组 ═══════════════════════
+
+/// approval-flow：拦截矩阵（高风险拦截 / 中风险放行 / pathParams 低风险拦截 /
+/// preapproved 放行 / AskUser 通过·拒绝）。
+Future<Map<String, Object?>> _approvalFlow() async {
+  final List<Map<String, Object?>> cases = <Map<String, Object?>>[];
+
+  // 场景一：默认拒绝，高风险工具被拦截。
+  {
+    final Context ctx = Context.root();
+    final AutoApproval gate = AutoApproval(false);
+    final ToolRegistry tools = ToolRegistry()
+      ..register(_GatedTool('delete', ToolRisk.high))
+      ..register(_GatedTool('echo', ToolRisk.medium));
+    provideTools(ctx, tools: tools);
+    provideApproval(ctx, approval: gate);
+    final ToolResult denied = await tools.call(ToolCall(name: 'delete'));
+    final ToolResult passed = await tools.call(ToolCall(name: 'echo'));
+    cases.add(<String, Object?>{
+      'label': '高拦截中放行（默认拒绝）',
+      'expect': <String, Object?>{
+        'deniedFailed': denied.isError,
+        'deniedCode': denied.error?.code,
+        'requests': gate.requests,
+        'passedFailed': passed.isError,
+      },
+    });
+    ctx.dispose();
+  }
+
+  // 场景二：pathParams 低风险工具被拦截；preapproved 放行不产生请求。
+  {
+    final Context ctx = Context.root();
+    final _PreapproveAll gate = _PreapproveAll();
+    final ToolRegistry tools = ToolRegistry()
+      ..register(_GatedTool('read_file', ToolRisk.low, pathParams: <String>['path']));
+    provideTools(ctx, tools: tools);
+    provideApproval(ctx, approval: gate);
+    final ToolResult result = await tools.call(
+        ToolCall(name: 'read_file', arguments: <String, Object?>{'path': '/etc/hosts'}));
+    cases.add(<String, Object?>{
+      'label': 'pathParams 低风险工具 preapproved 放行',
+      'expect': <String, Object?>{
+        'failed': result.isError,
+        'requests': gate.requests,
+      },
+    });
+    ctx.dispose();
+  }
+
+  // 场景三：AskUser 通过与拒绝。
+  {
+    final Context ctx = Context.root();
+    final CliAskUser ask = CliAskUser();
+    final AskUserApproval gate =
+        AskUserApproval(askUser: ask, timeout: const Duration(seconds: 5));
+    final ToolRegistry tools = ToolRegistry()..register(_GatedTool('delete', ToolRisk.high));
+    provideTools(ctx, tools: tools);
+    provideApproval(ctx, approval: gate);
+    final Future<ToolResult> approvedFuture = tools.call(ToolCall(name: 'delete'));
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+    ask.submit('y');
+    final ToolResult approved = await approvedFuture;
+    final Future<ToolResult> deniedFuture = tools.call(ToolCall(name: 'delete'));
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+    ask.submit('n');
+    final ToolResult denied = await deniedFuture;
+    cases.add(<String, Object?>{
+      'label': 'AskUser 通过/拒绝',
+      'expect': <String, Object?>{
+        'approvedFailed': approved.isError,
+        'deniedFailed': denied.isError,
+        'deniedCode': denied.error?.code,
+      },
+    });
+    ctx.dispose();
+  }
+
+  return <String, Object?>{
+    'name': 'approval-flow',
+    'kind': 'approval-flow',
+    'cases': cases,
+  };
+}
+
+/// sub-agent：spawn_agent 委托端到端（子模型先调工具再收口）。
+Future<Map<String, Object?>> _subAgent() async {
+  final Context ctx = Context.root();
+  final Session session = Session(id: 'main');
+  final _ScriptedProvider scripted = _ScriptedProvider(<LlmResult>[
+    LlmResult(content: '', provider: 'scripted', model: 'm', toolCalls: <LlmToolCall>[
+      LlmToolCall(id: 'c0', name: 'spawn_agent',
+          arguments: '{"task":"现在几点","tools":["get_time"]}'),
+    ]),
+    LlmResult(content: '', provider: 'scripted', model: 'm', toolCalls: <LlmToolCall>[
+      LlmToolCall(id: 'c1', name: 'get_time'),
+    ]),
+    _text('12:00'),
+    _text('子任务完成：12:00'),
+  ]);
+  final ToolRegistry tools = ToolRegistry();
+  tools.register(_TimeTool());
+  tools.register(SpawnAgentTool(host: ctx, llm: scripted, tools: tools,
+      defaultTools: <String>['get_time']));
+  final AgentLoop loop = AgentLoop(llm: scripted, tools: tools, session: session);
+  final AgentTurn turn = await loop.run('现在几点');
+  final Map<String, Object?> result = <String, Object?>{
+    'name': 'sub-agent',
+    'kind': 'sub-agent',
+    'expect': <String, Object?>{
+      'reply': turn.reply,
+      'steps': turn.steps.length,
+      'stepTool': turn.steps.isEmpty ? null : turn.steps.first.call.name,
+      'mainEventTypes': <String>[for (final SessionEvent e in session.events) e.type],
+      'mainModelCalls': scripted.calls.length,
+    },
+  };
+  ctx.dispose();
+  return result;
+}
+
+/// recovery：快照 → 还原 → list/delete → 版本不符抛错。
+Future<Map<String, Object?>> _recovery() async {
+  final MemorySnapshotStore store = MemorySnapshotStore();
+  final RecoveryService recovery = RecoveryService(store: store);
+  final Session session = Session(id: 's1');
+  session.append(kUserMessageEvent, data: <String, Object?>{'text': '你好'});
+  session.append(kAssistantMessageEvent, data: <String, Object?>{'text': '在的'});
+  await recovery.snapshot(session);
+  final Session restored = await recovery.restore('s1');
+  final List<String> listed = await recovery.list();
+  await recovery.delete('s1');
+  final List<String> afterDelete = await recovery.list();
+  String? versionError;
+  try {
+    SessionSnapshot.fromJson(<String, Object?>{
+      'version': 2,
+      'sessionId': 'x',
+      'events': <Object?>[],
+    });
+  } on RecoveryException catch (error) {
+    versionError = error.code;
+  }
+  return <String, Object?>{
+    'name': 'recovery',
+    'kind': 'recovery',
+    'expect': <String, Object?>{
+      'restoredTypes': <String>[for (final SessionEvent e in restored.events) e.type],
+      'restoredSeqs': <int>[for (final SessionEvent e in restored.events) e.seq],
+      'listed': listed,
+      'afterDelete': afterDelete,
+      'versionErrorCode': versionError,
+    },
+  };
+}
+
+/// 固定风险级与路径参数的工具（v1.2；v1.0 的 _FixedTool 无路径参数）。
+class _GatedTool extends Tool {
+  _GatedTool(this.toolName, this.risk, {this.pathParams = const <String>[]});
+
+  final String toolName;
+  final ToolRisk risk;
+  final List<String> pathParams;
+
+  @override
+  String get name => toolName;
+  @override
+  String get description => toolName;
+  @override
+  ToolRisk get riskLevel => risk;
+  @override
+  Future<ToolResult> call(ToolContext ctx) async => ToolResult.success('ok');
+}
+
+/// preapproved 恒放行的审批。
+class _PreapproveAll extends Approval {
+  int requests = 0;
+
+  @override
+  Stream<ApprovalRequest> get pending => const Stream<ApprovalRequest>.empty();
+
+  @override
+  Future<bool> preapproved(ApprovalRequest request) async => true;
+
+  @override
+  Future<bool> request(ApprovalRequest request) async {
+    requests++;
+    return false;
+  }
 }

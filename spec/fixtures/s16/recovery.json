@@ -1,0 +1,19 @@
+{
+  "name": "recovery",
+  "kind": "recovery",
+  "expect": {
+    "restoredTypes": [
+      "user/message",
+      "assistant/message"
+    ],
+    "restoredSeqs": [
+      0,
+      1
+    ],
+    "listed": [
+      "s1"
+    ],
+    "afterDelete": [],
+    "versionErrorCode": "unsupported-version"
+  }
+}

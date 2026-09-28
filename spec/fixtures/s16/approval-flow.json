@@ -1,0 +1,30 @@
+{
+  "name": "approval-flow",
+  "kind": "approval-flow",
+  "cases": [
+    {
+      "label": "高拦截中放行（默认拒绝）",
+      "expect": {
+        "deniedFailed": true,
+        "deniedCode": "APPROVAL_DENIED",
+        "requests": 1,
+        "passedFailed": false
+      }
+    },
+    {
+      "label": "pathParams 低风险工具 preapproved 放行",
+      "expect": {
+        "failed": false,
+        "requests": 0
+      }
+    },
+    {
+      "label": "AskUser 通过/拒绝",
+      "expect": {
+        "approvedFailed": false,
+        "deniedFailed": true,
+        "deniedCode": "APPROVAL_DENIED"
+      }
+    }
+  ]
+}

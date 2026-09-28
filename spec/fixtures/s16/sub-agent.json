@@ -1,0 +1,16 @@
+{
+  "name": "sub-agent",
+  "kind": "sub-agent",
+  "expect": {
+    "reply": "子任务完成：12:00",
+    "steps": 1,
+    "stepTool": "spawn_agent",
+    "mainEventTypes": [
+      "user/message",
+      "assistant/message",
+      "tool/result",
+      "assistant/message"
+    ],
+    "mainModelCalls": 4
+  }
+}

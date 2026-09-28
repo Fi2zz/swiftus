@@ -1,6 +1,6 @@
 # S16 · Agent Loop 产品化
 
-版本：v1.1 · 日期：2026-09-28 · 来源：conatus_agent `plan.dart` / `reflection.dart` / `router.dart` / `agent_loop.dart`；v1.1 增补来源：`telemetry.dart` / `caching.dart` / `context_metrics.dart` / `content_classifier.dart` / `layered_compaction.dart` / `eval*.dart` / `agent_provider.dart`
+版本：v1.2 · 日期：2026-09-28 · 来源：conatus_agent；v1.1 增补来源：`telemetry.dart` / `caching.dart` / `context_metrics.dart` / `content_classifier.dart` / `layered_compaction.dart` / `eval*.dart` / `agent_provider.dart`；v1.2 增补来源：`approval*.dart` / `sub_agent.dart` / `snapshot.dart` / `recovery.dart` 与 conatus_foundation `ask_user.dart`
 语言中立规格。Swiftus 实现注记见文末。
 前置：S3/S4（Session 与派生事件）、S5（工具管线）、S7（压缩）、S10（LLM）。
 范围说明：v1.0 覆盖 plan / reflection / router 三件套与 AgentLoop 集成点；telemetry / eval / approval / skill 沉淀 / goal 续行 / autonomous / caching / layered compaction 随对应刀滚动增补。
@@ -126,7 +126,40 @@ Agent Loop 里替模型跑一次「只允许 plan_write」的规划轮：
 
 `provideAgentLoop` 按上下文已提供的能力叠加装饰器，**由外到内**：Session Log（SessionLogLlmProvider，记录请求/响应）→ 缓存度量（CachingLlmProvider）→ 遥测（TelemetryLlmProvider）→ 原始提供方。未提供的能力不包装。telemetry 存在时 AgentLoop 的 onEvent 观察口接到 `telemetry.emit`（`agent.round` / `agent.finished` 入遥测）。
 
-## 6. 有意偏离
+## 6. 执行安全组（v1.2 增补：approval / sub-agent / recovery / ask-user）
+
+### 6.1 ask-user（SwiftusFoundation ask_user 域，随本刀提前）
+
+- `AskUser` 端口：`ask(prompt) async -> String`（等待期间被 cancel 应抛 `AskCancelledException`）+ `cancel()`（幂等，取消全部在途提问）；
+- `CliAskUser`：ask 不直接读 stdin——把 prompt 写出并登记在途提问，由 `submit(line)` 投递给最早等待者（测试或自定义输入源驱动）；cancel 后 ask 立即抛；
+- `provideAskUser`：服务键 `askUser`，随上下文释放 cancel。
+
+### 6.2 approval（服务键 `approval`）
+
+- `ApprovalRequest`：`{id, toolName, arguments, description, pathArgs, createdAt}`；toolName 为 `plan` 表示整份计划；
+- `Approval` 端口：`request(req) async -> bool` + `pending` 广播流 + `preapproved(req) async -> bool`（缺省 false——每次都问；实现方可用「工具 + 路径」粒度表达信任）+ `requestPlan(plan)`（缺省走 request，toolName `plan`，arguments 为计划 JSON，description 为计划摘要）+ `close()`；
+- `AutoApproval(approved)` / `RuleBasedApproval(allow)` / `AskUserApproval(askUser, yesWords 缺省 {y yes 是 允许 可以 好}, timeout 缺省 5 分钟)`——提问文案 `是否允许执行 "<tool>"？（<description>） (y/N)`，回答 trim + 小写后命中 yesWords；超时或异常视为拒绝；
+- `instrumentApproval(ctx, threshold = high, timeout = 5min)`：工具中间件——工具未注册直通；取出 `Tool.pathParams` 声明的参数取值（非空字符串，支持 `a.b` 嵌套）；`gated = 风险 ≥ threshold ∨ 声明了路径参数`（声明路径参数的低风险工具同样要问——「读文件也按目录授权」）；未 gated 直通；pathArgs 非空且 preapproved → 直通；否则发 `approval.requested` 遥测 → `request`（超时视为拒绝）→ 发 `approval.decided` → 拒绝返回 `APPROVAL_DENIED`（content `用户拒绝执行 "<tool>"`）；
+- `provideApproval(instrument = true)`：缺省 `AutoApproval(false)`（安全优先）；instrument 为 false 只提供服务不挂拦截（拦截阈值由别处决定，避免两层中间件重复询问）；随上下文释放 close。
+
+### 6.3 sub-agent（spawn_agent 工具，风险 medium）
+
+- `kDefaultSubAgentPrompt`：`你是内部子助手，只完成交办的一件事。只依据工具返回的事实作答，禁止编造；完成后直接给出结论简报（尽量简短），不要寒暄、不要反问用户。`；
+- `SubAgentResult`：`{status: success|failed, output, rounds, tool_calls}`；
+- `SpawnAgentTool(host, llm, tools, defaultTools?, maxRounds = 8, subAgentPrompt, systemPrompt?)`：`call(task, tools?, max_rounds?)` → `run(task, allowed, maxRounds)`：
+  - 子上下文在宿主下派生（`host.plugin`，随宿主释放），子会话 id `subagent-<seq>-<微秒>`，子注册表只含白名单工具实例；
+  - 白名单：显式 `tools` 参数（只留注册表里存在且非 spawn_agent 的名）→ `defaultTools`（同过滤）→ 主注册表全部非 high 且非本工具；
+  - 子 AgentLoop（systemPrompt 缺省不用、defaultSystemPrompt 用 subAgentPrompt、maxSteps = maxRounds）跑任务；失败收敛为 `status: failed`（`子 Agent 失败：<error>`），不向外抛；finally 释放子上下文；
+- `provideSpawnAgent`：注册工具。
+
+### 6.4 recovery（服务键 `recovery`）
+
+- `SessionSnapshot`：`{version: 1, sessionId, savedAt?, events[]}`；fromJson 版本不符抛 `RecoveryException('unsupported-version')`；
+- `SnapshotStore` 端口：save（覆盖）/ load（不存在 nil）/ list / delete；`MemorySnapshotStore` 进程内实现；
+- `RecoveryService`：`snapshot(session)`（建议每轮结束或会话释放调用）/ `load(id)`（不存在或版本不符抛 `RecoveryException('not-found' | 'unsupported-version')`）/ `restore(id)`（由快照重建带事件种子的会话，可直接交给 Agent Loop 继续对话）/ list / delete；
+- `provideRecovery`：存储优先级 store > 'database' 服务（DatabaseSnapshotStore，W3 后补）> 内存实现。
+
+## 7. 有意偏离
 
 （无。）
 
