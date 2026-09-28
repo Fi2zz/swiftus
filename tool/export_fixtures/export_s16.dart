@@ -27,6 +27,7 @@ Future<void> main() async {
     'sub-agent': _subAgent,
     'recovery': _recovery,
     'skill': _skill,
+    'goal-flow': _goalFlow,
   };
   const JsonEncoder encoder = JsonEncoder.withIndent('  ');
   for (final MapEntry<String, Future<Map<String, Object?>> Function()> entry
@@ -916,3 +917,91 @@ class _EchoTool extends Tool {
 
 Map<String, Object?> _metaJson(SkillMeta meta) =>
     <String, Object?>{'name': meta.name, 'description': meta.description};
+
+// ═══════════════════════ v1.4 增补：goal ═══════════════════════
+
+/// goal-flow：状态机 / 重复创建 / cleared 还原 / fork 不继承 / 工具端到端 /
+/// approval 拒绝 / 续行驱动器。
+Future<Map<String, Object?>> _goalFlow() async {
+  final Session session = Session(id: 's1');
+  final DefaultGoalService goal = DefaultGoalService(session: session, defaultMaxRounds: 3);
+  final Goal created = await goal.create('学英语');
+  final Goal edited = await goal.edit('学英语每天');
+  final Goal paused = await goal.pause();
+  final Goal resumed = await goal.resume();
+  await goal.advanceRound();
+  await goal.advanceRound();
+  await goal.advanceRound();
+  final Goal finalState = goal.current!;
+  String? duplicateCode;
+  try {
+    await goal.create('另一个');
+  } on GoalException catch (e) {
+    duplicateCode = e.code;
+  }
+
+  final Session clearedSession = Session(id: 's2');
+  final DefaultGoalService clearedService = DefaultGoalService(session: clearedSession);
+  await clearedService.create('临时目标');
+  await clearedService.clear();
+  final Goal? clearedRestored = restoreGoalState(clearedSession);
+
+  final Session forkSession = Session(id: 's3');
+  final DefaultGoalService forkGoal = DefaultGoalService(session: forkSession);
+  await forkGoal.create('父目标');
+  final Session forked = forkSession.fork(id: 's3-fork-1');
+  final Goal? forkRestored = restoreGoalState(forked);
+
+  final Context ctx = Context.root();
+  final ToolRegistry tools = ToolRegistry();
+  provideTools(ctx, tools: tools);
+  final DefaultGoalService toolGoal = DefaultGoalService(session: Session(id: 's4'));
+  provideGoal(ctx, goal: toolGoal, tools: tools);
+  final ToolResult toolReply = await tools.call(ToolCall(name: 'create_goal', arguments: <String, Object?>{'text': '报时'}));
+
+  String? approvalDeniedCode;
+  final DefaultGoalService deniedGoal = DefaultGoalService(
+    session: Session(id: 's5'),
+    approval: AutoApproval(false),
+  );
+  await deniedGoal.create('需确认');
+  try {
+    await deniedGoal.complete();
+  } on GoalException catch (e) {
+    approvalDeniedCode = e.code;
+  }
+
+  final Session driverSession = Session(id: 's6');
+  final DefaultGoalService driverGoal = DefaultGoalService(session: driverSession, defaultMaxRounds: 2);
+  await driverGoal.create('驱动目标');
+  final _ScriptedProvider driverLlm = _ScriptedProvider(<LlmResult>[_text('回复1'), _text('回复2')]);
+  final AgentLoop driverLoop = AgentLoop(llm: driverLlm, tools: ToolRegistry(), session: driverSession);
+  final GoalRoundDriver driver = GoalRoundDriver(goal: driverGoal, agent: driverLoop);
+  driverLoop.goalDriver = driver;
+  final AgentTurn driverTurn = await driverLoop.run('开始');
+  final Goal driverFinal = driverGoal.current!;
+
+  return <String, Object?>{
+    'name': 'goal-flow',
+    'kind': 'goal-flow',
+    'expect': <String, Object?>{
+      'createdStatus': created.status.name,
+      'editedText': edited.text,
+      'pausedStatus': paused.status.name,
+      'resumedStatus': resumed.status.name,
+      'finalRound': finalState.round,
+      'finalBlocked': finalState.status == GoalStatus.blocked,
+      'finalBlockReason': finalState.blockReason,
+      'sessionEventTypes': <String>[for (final SessionEvent e in session.events) e.type],
+      'duplicateCode': duplicateCode,
+      'clearedRestored': clearedRestored == null,
+      'forkNotInherited': forkRestored == null,
+      'toolReply': toolReply.content,
+      'approvalDeniedCode': approvalDeniedCode,
+      'driverReply': driverTurn.reply,
+      'driverRound': driverFinal.round,
+      'driverBlocked': driverFinal.status == GoalStatus.blocked,
+      'driverModelCalls': driverLlm.calls.length,
+    },
+  };
+}

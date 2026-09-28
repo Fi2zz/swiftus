@@ -1,0 +1,31 @@
+{
+  "name": "goal-flow",
+  "kind": "goal-flow",
+  "expect": {
+    "createdStatus": "active",
+    "editedText": "学英语每天",
+    "pausedStatus": "paused",
+    "resumedStatus": "active",
+    "finalRound": 3,
+    "finalBlocked": true,
+    "finalBlockReason": "达到轮次上限，等待用户介入",
+    "sessionEventTypes": [
+      "goal/changed",
+      "goal/changed",
+      "goal/changed",
+      "goal/changed",
+      "goal/changed",
+      "goal/changed",
+      "goal/changed"
+    ],
+    "duplicateCode": "already_exists",
+    "clearedRestored": true,
+    "forkNotInherited": true,
+    "toolReply": "好的，我会持续关注：报时",
+    "approvalDeniedCode": "cancelled",
+    "driverReply": "回复2",
+    "driverRound": 2,
+    "driverBlocked": true,
+    "driverModelCalls": 2
+  }
+}

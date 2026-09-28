@@ -177,7 +177,39 @@ Agent Loop 里替模型跑一次「只允许 plan_write」的规划轮：
 - `AgentLoop` 增 `memory` 参数：buildSystemText 的记忆段（`[相关记忆]` 段，逐行 `- <text>`，最多 `memoryLimit` 条，空记忆不占位）；`_finish` 时 `remember('用户：<input>\n助手：<reply>', tags: {conversation})`（reply 非空才记）；`run` 开头 `memory.load()`；
 - `memoryLimit` 缺省 5。
 
-## 7. 有意偏离
+## 7. Goal（v1.4 增补）
+
+### 7.1 词汇与事件协议
+
+- `goal/changed` 事件：目标状态**整值替换**持久化到会话（append-only，折叠最后一条）；派生状态只折叠 `ownEvents`（fork 不继承目标）；
+- `GoalRevision`：`{text, revisedAt}`（修订历史含初版）；`Goal`：`{id, text, status, round, maxRounds, createdAt, updatedAt, revisions, blockReason?}`；id 形如 `goal-<微秒>`；status ∈ active / paused / blocked / completed / cleared；`isTerminal`（completed / cleared）/ `isAdvanceable`（active）；
+- `restoreGoalState(session)`：倒序扫 ownEvents 取最后一条 `goal/changed`；无事件或最后状态为 `cleared` → nil；
+- 每会话至多一个当前目标。
+
+### 7.2 GoalService（服务键 `goal`）与状态机
+
+`current`（无目标或 cleared 时 nil）/ `create(text, maxRounds?)`（已有非终态目标抛 `already_exists`）/ `edit(text)`（仅 active / paused 可编辑）/ `pause()`（仅 active）/ `resume()`（paused / blocked → active，清 blockReason）/ `complete()`（终态，走 approval 确认）/ `block(reason)`（active / paused 可阻塞）/ `clear()`（任意状态 → cleared 终态，走 approval 确认）/ `advanceRound()`（active 才推进；`round + 1 >= maxRounds` 时自动 block（`kGoalRoundLimitReason`）并置 round = maxRounds）/ `changes` 流 / `restore(session)` / `dispose()`。
+
+错误码：`already_exists` / `invalid_status` / `no_goal` / `cancelled`（approval 拒绝，消息「用户取消」）。
+
+### 7.3 默认实现（DefaultGoalService）与能力缝（GoalSeams）
+
+- `GoalSeams` 集中解析 session / systemPrompt / approval / telemetry 四个可选依赖（显式 > 上下文 > 降级：不持久化 / 无注入 / 自动批准 / 无埋点），承载使用点：`appendEvent`（整值替换写事件）、`emit`（`goal.created` / `goal.edited` / `goal.paused` / `goal.resumed` / `goal.blocked` / `goal.completed` / `goal.cleared` / `goal.advanced`，data `{id, status}`）、`confirm`（approval request，拒绝抛 `cancelled`）、`syncSection` / `detachSection`（`goal` 段：有目标注入 order 50 的 PromptSection、无目标撤销；段文本 `[当前目标]\n<text>` + 进度 `\n进度：第 N / M 轮`（round > 0 时））；
+- `DefaultGoalService`：构造时若 session 可解析则 restore；每次变更 `_commit`（存值 → 写事件 → 同步段 → changes 广播 → 埋点）。
+
+### 7.4 续行驱动器（GoalRoundDriver）
+
+- `kGoalContinuationPrompt` = `[系统] 继续推进当前目标。`；
+- `shouldContinue()`：无目标 → wait；completed / cleared / blocked → stop；paused → wait；active 且 `round < maxRounds` → proceed，否则自动 block（轮次上限原因）→ stop；
+- `advance(cancel?)`：proceed 才继续——`goal.advanceRound()` → 再查（仍 proceed）→ `agent.run(kGoalContinuationPrompt, cancel)`；返回 nil 表示停止续行；
+- AgentLoop 每轮收口后经 `goalDriver` 续行：driver 非空且会话未关闭 → `advance(cancel)` 返回非 nil 则作为本轮结果（递归续行直至等待用户或停止）。
+
+### 7.5 工具与装配
+
+- 四工具（low：create / edit / complete；medium：clear）：`create_goal(text, max_rounds?)` / `edit_goal(text)` / `complete_goal` / `clear_goal`；成功口语化文案（`好的，我会持续关注：<text>` / `好的，目标已更新：<text>` / `目标已标记完成。` / `好的，目标已清除。`）；GoalException → `ToolResult.failure(message, error: ToolError(code, message))`；`pause` / `resume` / `block` 不暴露给模型（用户命令或驱动器调用）；
+- `provideGoal(ctx, goal?, session?, prompt?, tools?, approval?, telemetry?, defaultMaxRounds = 256)`：提供服务 + 注册四工具 + `ctx.inject(['agentLoop'])` 后置挂 `GoalRoundDriver` 到 `AgentLoop.goalDriver`（agentLoop 依赖消失或上下文释放自动摘除，onDispose 置 nil）+ 随上下文释放 dispose。
+
+## 8. 有意偏离
 
 （无。）
 
