@@ -15,6 +15,7 @@ public final class MemoryStore {
     private var listeners: [UUID: @ContextTreeActor () -> Void] = [:]
     private var didLoad = false
     private var seq = 0
+    private var lastCreatedAt: Date?
 
     /// maxEntries 为负时快速失败。
     public init(maxEntries: Int = 1000, backend: (any MemoryBackend)? = nil) throws {
@@ -60,7 +61,7 @@ public final class MemoryStore {
             id: "memory-\(Int(Date().timeIntervalSince1970 * 1_000_000))-\(seq)",
             text: text,
             tags: tags,
-            createdAt: Date()
+            createdAt: nextCreatedAt()
         )
         entries.append(entry)
         govern()
@@ -159,6 +160,19 @@ public final class MemoryStore {
         try await backend.save(entries)
         notify()
         return deleted
+    }
+
+    /// createdAt 单调化：系统时钟精度不足（同微秒）时前推 1μs，
+    /// 保证同分排序的「新→旧」与 Dart 微秒级 DateTime 一致（规格 S13 注记）。
+    private func nextCreatedAt() -> Date {
+        let now = Date()
+        if let last = lastCreatedAt, now <= last {
+            let advanced = last.addingTimeInterval(0.000_001)
+            lastCreatedAt = advanced
+            return advanced
+        }
+        lastCreatedAt = now
+        return now
     }
 
     private func notify() {
