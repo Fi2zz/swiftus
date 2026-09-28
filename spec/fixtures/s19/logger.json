@@ -52,9 +52,9 @@
           "[W] root  w boom",
           "[E] root  e bad",
           "trace",
-          "2026-09-28T17:21:29.414366 [I] root  has-time"
+          "<time> [I] root  has-time"
         ],
-        "showTimeAddsIsoPrefix": false
+        "showTimeAddsIsoPrefix": true
       }
     }
   ]

@@ -6,7 +6,7 @@
 
 **swiftus** 是 [conatus](https://github.com/Fi2zz/conatus)（Dart 实现的「时空可组合性」编程范式框架：可逆效应 + 反应式共效应）的 Swift 移植版，命名延续 cordis（TS）→ conatus（Dart）→ swiftus（Swift）的拉丁谱系。移植动机是摆脱 Dart 运行时单一依赖，使框架成为语言中立的资产。
 
-**当前状态（2026-09-28）**：**W2 已收口**——W1 的 core / credentials 最小集 / llm / prompt / tool / skill 之上，Compaction / Schedule / session 持久化层 / Agent 全特性 / 任务中心全部就位，离线 Demo `swift run swiftus-demo` 跑通「提问 → 工具调用 → 回填 → 收口」（脚本化模型，无需 Key），swift-testing 253 例 54 套件 debug+release 双绿、release 零警告。外部依赖：Yams（仅 SwiftusSkill）+ 系统 CryptoKit（SigV4）。平台 floor macOS 13 / iOS 16（§5.6 抬升）。没有 CI。W3 进行中：凭据全量 + SigV4（S12 v1.1 / S15）与 Foundation 能力域 fs + shell（S18）已收口，余下 Foundation 其余能力域（database / timer / time-context / logger / loader）→ Cron(S9) → Search → MCP(S11)。
+**当前状态（2026-09-28）**：**W2 已收口**——W1 的 core / credentials 最小集 / llm / prompt / tool / skill 之上，Compaction / Schedule / session 持久化层 / Agent 全特性 / 任务中心全部就位，离线 Demo `swift run swiftus-demo` 跑通「提问 → 工具调用 → 回填 → 收口」（脚本化模型，无需 Key），swift-testing 281 例 60 套件 debug+release 双绿、release 零警告。外部依赖：Yams（仅 SwiftusSkill）+ 系统 CryptoKit（SigV4）。平台 floor macOS 13 / iOS 16（§5.6 抬升）。没有 CI。W3 进行中：凭据全量 + SigV4（S12 v1.1 / S15）与 Foundation 全部 14 个能力域（S18 fs+shell、S19 database/timer/time-context/logger/loader）已收口，余下 Cron(S9) → Search → MCP(S11)。
 
 移植范围（已拍板）：
 
@@ -46,7 +46,7 @@ Sources/
   SwiftusCore/              # 内核：Context / EffectScope / Reactor（可逆效应语义）
   SwiftusFoundation/        # 14 能力域：tools / session / session-log / system-prompt /
                             #   memory / database / fs / shell / time-context / timer /
-                            #   logger / loader / ask-user / uuid（fs/shell 随 S18 落地）
+                            #   logger / loader / ask-user / uuid（14 域已全部落地：S18 / S19）
   SwiftusCredentials/       # 凭据五种来源 + AWS SigV4 签名链
   SwiftusLLM/               # chat / responses 双形态、流式增量、fallback 链
   SwiftusCompaction/        # 压缩切点（平衡切点）算法
@@ -93,9 +93,9 @@ docs/.handoffs/             # 两份权威文档（中文，移植的全部决�
 
 ## 规格体系（动工前置条件）
 
-规格沉淀为**滚动式**：每个领域动工前，该领域对应规格文档与 fixtures 必须就绪。规格编号滚动（S1 起，W3 预留 S9 Cron / S11 MCP），要点见方案书 §3.1，包括：S1 效应语义（LIFO 撤销/幂等/迟到登记/重入收敛 maxRounds=100/循环依赖检测）、S2 上下文树、S3/S4 Session 事件 JSONL 格式与 fork/replay、S5 工具管线（schema 白名单投影、失败码全集、超时优先级）、S6 Prompt 装配、S7 压缩切点、S8 调度语义（DST 缺口拒绝、重叠取较早）、S9 Cron 语义、S10 LLM 协议、S11 MCP 客户端、S12 凭据、S13 Memory 召回（中文二元组打分）、S14 Skill catalog、S15 SigV4、S16 Agent Loop 产品化、S17 任务中心、S18 Foundation 能力域（fs / shell）。
+规格沉淀为**滚动式**：每个领域动工前，该领域对应规格文档与 fixtures 必须就绪。规格编号滚动（S1 起，W3 预留 S9 Cron / S11 MCP），要点见方案书 §3.1，包括：S1 效应语义（LIFO 撤销/幂等/迟到登记/重入收敛 maxRounds=100/循环依赖检测）、S2 上下文树、S3/S4 Session 事件 JSONL 格式与 fork/replay、S5 工具管线（schema 白名单投影、失败码全集、超时优先级）、S6 Prompt 装配、S7 压缩切点、S8 调度语义（DST 缺口拒绝、重叠取较早）、S9 Cron 语义、S10 LLM 协议、S11 MCP 客户端、S12 凭据、S13 Memory 召回（中文二元组打分）、S14 Skill catalog、S15 SigV4、S16 Agent Loop 产品化、S17 任务中心、S18 Foundation 能力域（fs / shell）、S19 Foundation 能力域（database / timer / time-context / logger / loader）。
 
-- 规格文档与 fixtures 均放本仓 `spec/` 目录（规格 `spec/*.md`、用例 `spec/fixtures/s*/`）——已就位：S1/S2/S3/S4/S5/S6/S7/S8/S10/S12/S13/S14/S15/S16/S17/S18（fixtures 覆盖 s4/s7/s8/s12/s13/s15/s16/s17/s18）；
+- 规格文档与 fixtures 均放本仓 `spec/` 目录（规格 `spec/*.md`、用例 `spec/fixtures/s*/`）——已就位：S1/S2/S3/S4/S5/S6/S7/S8/S10/S12/S13/S14/S15/S16/S17/S18/S19（fixtures 覆盖 s4/s7/s8/s12/s13/s15/s16/s17/s18/s19）；
 - fixtures 由 Dart 脚本导出器（本仓 `tool/export_fixtures/export_s*.dart`）在本地 conatus checkout 上导出并校验，**fixtures 以 Dart 侧行为为准绳导出，不是手写**；
 - 每条规格至少 3 个用例；发现语义漏译时补一条 fixture 而非补丁代码；
 - **fixtures 不锁语言运行时序**：事件循环投递时机、广播流订阅时机之类的表面差异不进 fixture，改由 Swift 侧单元测试断言（见 HANDOFF「已采的坑」）。

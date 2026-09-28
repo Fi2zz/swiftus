@@ -12,12 +12,17 @@ struct S18Fixture {
 }
 
 enum S18FixtureLoader {
-    static func load(kind: String) -> [S18Fixture] {
+    /// 按 kind 装载 fixture；`spec` 缺省 s18（S19 起各自指定目录）。
+    ///
+    /// **装载不到任何 fixture 时调用方必须显式失败**：参数化用例拿到空集合会被
+    /// 静默跳过，于是「零 fixture 全绿」看起来像通过（本项目已吃过一次：S19 的运行器
+    /// 误用 s18 装载器，全部用例空跑）。故每个测试另有一条 `fixtureInventory` 断言。
+    static func load(kind: String, spec: String = "s18") -> [S18Fixture] {
         let directory = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
-            .appending(path: "spec/fixtures/s18", directoryHint: .isDirectory)
+            .appending(path: "spec/fixtures/\(spec)", directoryHint: .isDirectory)
         guard let names = try? FileManager.default.contentsOfDirectory(atPath: directory.path()) else {
             return []
         }
@@ -140,4 +145,28 @@ private func s18Differences(
 private func s18Brief(_ value: JSONValue, limit: Int = 200) -> String {
     guard case let .string(text) = value else { return String(describing: value) }
     return text.count > limit ? String(text.prefix(limit)) + "…" : text
+}
+
+
+/// 装载自检：每个 kind 必须恰好命中一个 fixture 文件、且用例非空。
+@Suite("fixtures 装载自检")
+struct FixtureInventoryTests {
+    @Test("s18 各 kind 恰好一件且用例非空", arguments: [
+        "fs-paths", "fs-ops", "shell-resolve", "shell-run", "shell-start",
+    ])
+    func s18Inventory(_ kind: String) {
+        let fixtures = S18FixtureLoader.load(kind: kind, spec: "s18")
+        #expect(fixtures.count == 1, "\(kind) 应恰好命中一个 fixture 文件")
+        #expect(fixtures.first?.cases.isEmpty == false, "\(kind) 的用例不应为空")
+    }
+
+    @Test("s19 各 kind 恰好一件且用例非空", arguments: [
+        "database-hub", "database-unit", "database-json",
+        "timer", "time-context", "logger", "loader",
+    ])
+    func s19Inventory(_ kind: String) {
+        let fixtures = S18FixtureLoader.load(kind: kind, spec: "s19")
+        #expect(fixtures.count == 1, "\(kind) 应恰好命中一个 fixture 文件")
+        #expect(fixtures.first?.cases.isEmpty == false, "\(kind) 的用例不应为空")
+    }
 }

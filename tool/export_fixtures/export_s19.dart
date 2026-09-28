@@ -237,7 +237,8 @@ Future<Map<String, Object?>> _databaseUnit() async {
       'unit': change.unit,
       'key': change.key,
       'kind': change.kind.name,
-      'hasValue': change.value != null,
+      // 「值是空的」在两端分别是 null 与 .null，故投影成布尔而不是原值。
+      'valueIsNull': change.value == null,
     });
   });
 
@@ -290,6 +291,16 @@ Future<Map<String, Object?>> _databaseUnit() async {
       <String, Object?>{
         'scenario': 'close',
         'label': 'close：幂等、清空监听器、关闭后写入抛 unit-closed、已从 hub 摘除',
+        // 与 write-chain 同样的写入：先产生 4 条变更，再验证关闭行为（自描述）。
+        'input': <String, Object?>{
+          'unit': 'u',
+          'puts': <Object?>[
+            <String, Object?>{'key': 'name', 'value': '助手'},
+            <String, Object?>{'key': 'empty', 'value': null},
+            <String, Object?>{'key': 'name', 'value': '助手二代'},
+          ],
+          'deletes': <String>['name', 'ghost'],
+        },
         'expect': <String, Object?>{
           'afterClose': <String, Object?>{'error': _dbCode(afterClose!)},
           'closed': unit.closed,
@@ -429,22 +440,26 @@ Future<Map<String, Object?>> _timer() async {
   } catch (_) {
     // 到点前被中断即视为未睡成（只断言 sleep 是否正常完成）。
   }
+  // 上下文在到点前被释放 → sleep 以错误结束（不悬挂）。**必须真的 dispose**：
+  // 第一版忘了 dispose，sleep 自然跑完、用例什么也没验证（fixture 断言发现）。
   final Context t5 = Context.root(name: 'timer/sleep-cut');
-  String? cutError;
-  bool? interrupted = true;
+  bool interrupted = false;
+  final Future<void> pending = t5.sleep(const Duration(milliseconds: 3000));
+  await Future<void>.delayed(const Duration(milliseconds: 60));
+  t5.dispose();
   try {
-    await t5.sleep(const Duration(milliseconds: 3000));
-    interrupted = false;
-  } catch (error) {
-    cutError = error is StateError ? 'StateError' : error.runtimeType.toString();
+    await pending;
+  } catch (_) {
+    interrupted = true;
   }
   cases.add(<String, Object?>{
     'scenario': 'sleep',
     'label': 'sleep 到点完成；上下文提前释放以错误结束（不悬挂）',
     'expect': <String, Object?>{
       'slept': slept,
+      // 错误**类型**随语言而异（StateError / ContextDisposedError），
+      // 只断言「以错误结束而不是悬挂」；具体类型由 Swift 侧单元测试锁定。
       'interrupted': interrupted,
-      'interruptedIsStateError': cutError,
     },
   });
 
@@ -596,6 +611,8 @@ Future<Map<String, Object?>> _timeContext() async {
 
 Future<Map<String, Object?>> _logger() async {
   final List<Map<String, Object?>> cases = <Map<String, Object?>>[];
+  // 控制台行的 ISO 时刻是墙钟 → 归一为 <time>（时间不入 fixture，S19 §6）。
+  List<String> _normalizedLines = const <String>[];
 
   // 级别过滤 + 环形上限 + 导出器增删。
   final LoggerService service = LoggerService(defaultName: 'root', level: LogLevel.warn)
@@ -670,14 +687,21 @@ Future<Map<String, Object?>> _logger() async {
   final LoggerService timedService = LoggerService(level: LogLevel.debug)
     ..addExporter(timed);
   timedService.info('has-time');
+  // 全部写完后归一（避免把墙钟写进 fixture）：ISO 时刻前缀 → <time>。
+  _normalizedLines = <String>[
+    for (final String line in lines)
+      RegExp(r'^\d{4}-\d{2}-\d{2}T[^ ]* ').hasMatch(line)
+          ? line.replaceFirst(RegExp(r'^\d{4}-\d{2}-\d{2}T[^ ]*'), '<time>')
+          : line,
+  ];
   cases.add(<String, Object?>{
     'scenario': 'console',
     'label': '控制台导出器：[标签] 名字  消息；error 追加一个空格；堆栈另起一行；导出器自身级别过滤；showTime 只加时间前缀',
     'expect': <String, Object?>{
-      'lines': lines,
-      'showTimeAddsIsoPrefix': RegExp(
-        r'^\d{4}-\d{2}-\d{2}T.*Z \[I\] has-time$',
-      ).hasMatch(lines.last),
+      // showTime 的 ISO 时刻是墙钟，逐次变化 → 归一为 <time> 后只比对形状。
+      'lines': _normalizedLines,
+      'showTimeAddsIsoPrefix':
+          RegExp(r'^<time> \[I\] root  has-time$').hasMatch(_normalizedLines.last),
     },
   });
 
@@ -699,10 +723,11 @@ class _Collector implements LogExporter {
 
 Future<Map<String, Object?>> _loader() async {
   final List<String> log = <String>[];
-  PluginFactory factory(String id) => (Context child, Object? config) {
-        log.add('$id:${config ?? '-'}');
-        child.onDispose(() => log.add('$id:off'));
-      };
+  // 记号与辅助函数名无关（on:/off:），两端日志才可比。
+  PluginFactory factory(String _) => (Context child, Object? config) {
+    log.add('on:${config ?? '-'}');
+    child.onDispose(() => log.add('off:${config ?? '-'}'));
+  };
 
   // 注册表：空名被拒、同名覆盖、unregister 返回值。
   final Context ctx = Context.root();
@@ -735,8 +760,8 @@ Future<Map<String, Object?>> _loader() async {
   final List<String> log2 = <String>[];
   final Loader loader2 = provideLoader(ctx2, plugins: <String, PluginFactory>{
     'a': (Context child, Object? config) {
-      log2.add('a:${config ?? '-'}');
-      child.onDispose(() => log2.add('a:off'));
+      log2.add('on:${config ?? '-'}');
+      child.onDispose(() => log2.add('off:${config ?? '-'}'));
     },
   });
   final String id1 = loader2.load(const LoaderEntry(name: 'a', config: 'x'));
@@ -811,7 +836,8 @@ Future<Map<String, Object?>> _loader() async {
     'expect': <String, Object?>{
       'ids': loader3.ids,
       'isEmptyFalse': !loader3.isEmpty,
-      'log': log3,
+      // 拷快照：直接投影活列表会把后续 dispose 的日志也写进 fixture（本项目踩过）。
+      'log': List<String>.of(log3),
     },
   });
 
@@ -842,7 +868,7 @@ Future<Map<String, Object?>> _loader() async {
     'label': '配置树：分组递归子节点、禁用项不加载插件但仍登记、entry 可 JSON 往返',
     'expect': <String, Object?>{
       'ids': loader4.ids,
-      'log': log4,
+      'log': List<String>.of(log4),
       'disabledHasNoContext': !disabledHasContext,
       'groupRoundtrip': roundtrip,
     },

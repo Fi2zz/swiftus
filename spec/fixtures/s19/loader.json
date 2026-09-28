@@ -44,10 +44,10 @@
         "groupHasNoContext": true,
         "entryOfGroupIsGroup": true,
         "logAfterRemove": [
-          "a:x",
-          "a:y",
-          "a:child",
-          "a:off"
+          "on:x",
+          "on:y",
+          "on:child",
+          "off:x"
         ],
         "idGoneAfterRemove": true,
         "reloadKeepsSingleContext": false,
@@ -72,8 +72,7 @@
           "on:2",
           "off:2",
           "off:1",
-          "on:3",
-          "off:3"
+          "on:3"
         ]
       }
     },

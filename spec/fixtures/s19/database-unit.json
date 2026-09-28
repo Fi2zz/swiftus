@@ -33,25 +33,25 @@
             "unit": "u",
             "key": "name",
             "kind": "put",
-            "hasValue": true
+            "valueIsNull": false
           },
           {
             "unit": "u",
             "key": "empty",
             "kind": "put",
-            "hasValue": false
+            "valueIsNull": true
           },
           {
             "unit": "u",
             "key": "name",
             "kind": "put",
-            "hasValue": true
+            "valueIsNull": false
           },
           {
             "unit": "u",
             "key": "name",
             "kind": "deleted",
-            "hasValue": false
+            "valueIsNull": true
           }
         ],
         "deleteExisting": true,
@@ -70,6 +70,27 @@
     {
       "scenario": "close",
       "label": "close：幂等、清空监听器、关闭后写入抛 unit-closed、已从 hub 摘除",
+      "input": {
+        "unit": "u",
+        "puts": [
+          {
+            "key": "name",
+            "value": "助手"
+          },
+          {
+            "key": "empty",
+            "value": null
+          },
+          {
+            "key": "name",
+            "value": "助手二代"
+          }
+        ],
+        "deletes": [
+          "name",
+          "ghost"
+        ]
+      },
       "expect": {
         "afterClose": {
           "error": "unit-closed"

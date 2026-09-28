@@ -23,8 +23,7 @@
       "label": "sleep 到点完成；上下文提前释放以错误结束（不悬挂）",
       "expect": {
         "slept": true,
-        "interrupted": false,
-        "interruptedIsStateError": null
+        "interrupted": true
       }
     },
     {
