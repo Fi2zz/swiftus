@@ -41,4 +41,5 @@
 
 - `MemoryStore` 为 `@ContextTreeActor final class`；`MemoryEntry` 为 Sendable struct（jsonValue / init(jsonValue:) 往返）；`MemoryBackend` 为非隔离 async 协议（文件 IO 不占 actor）；
 - 中文词元化按 `Character` 序切二元组（Swift String 的 Character 是扩展字位簇；Dart 按 UTF-16 码元——中文 BMP 内两语言对汉字切分结果一致，坑 #6 的 fixtures 用中文用例对齐）；
+- `createdAt` 单调化：Swift `Date()` 精度（Double 秒）低于 Dart `DateTime` 微秒，连续 `remember` 可能同刻——按「上次 + 1μs」前推，保证同分排序的「新→旧」语义稳定；
 - `JsonMemoryBackend` 的路径参数为字符串（文件 URL 由调用方拼），写入走 JSONValue 序列化。

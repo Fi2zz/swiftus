@@ -209,7 +209,35 @@ Agent Loop 里替模型跑一次「只允许 plan_write」的规划轮：
 - 四工具（low：create / edit / complete；medium：clear）：`create_goal(text, max_rounds?)` / `edit_goal(text)` / `complete_goal` / `clear_goal`；成功口语化文案（`好的，我会持续关注：<text>` / `好的，目标已更新：<text>` / `目标已标记完成。` / `好的，目标已清除。`）；GoalException → `ToolResult.failure(message, error: ToolError(code, message))`；`pause` / `resume` / `block` 不暴露给模型（用户命令或驱动器调用）；
 - `provideGoal(ctx, goal?, session?, prompt?, tools?, approval?, telemetry?, defaultMaxRounds = 256)`：提供服务 + 注册四工具 + `ctx.inject(['agentLoop'])` 后置挂 `GoalRoundDriver` 到 `AgentLoop.goalDriver`（agentLoop 依赖消失或上下文释放自动摘除，onDispose 置 nil）+ 随上下文释放 dispose。
 
-## 8. 有意偏离
+## 8. Autonomous（v1.5 增补：自主运营；priority 引擎随附）
+
+### 8.1 策略（AutonomousPolicy，Capability Seam）
+
+- 硬约束：`dailyBudget`（美元；∞ 无限制）/ `activeWindow`（TimeWindow?，null 全天）/ `allowedActions`（白名单；空集不限制）/ `requireApproval`（黑名单）/ `maxContinuousRounds`（缺省 8）/ `maxTurnDuration`（缺省 5 分钟）/ `requireHumanInLoop`（缺省 false）；
+- `firstViolation(steps)`：首个命中黑名单、或白名单非空且未在白名单的工具名；无违规 null；
+- `TimeWindow(start, end)`：0-23 点内一天时刻，支持跨午夜（start > end）；end 允许到 48 小时内；`contains(time)` 端点含（跨午夜 `t >= start || t <= end`）；`nextStart(from)`（从 from 之后窗口的下一次开始，取 start 当天或次日）；
+- `CostTracker`：`todayCost`（预算输入缝，不提供视为无预算限制）。
+
+### 8.2 PriorityEngine
+
+纯函数：`score = importance * 0.5 + urgency * 0.3 + (1 - progress) * 0.2`；importance / urgency 缺省 5 可按 goal.id 覆盖；progress = round / maxRounds clamp 0-1（maxRounds ≤ 0 时 0）；`selectNext` 取最高分（同分保持原序，单趟扫描严格大于才替换）。
+
+### 8.3 默认实现（DefaultAutonomousRunner + AutonomousLoop + AutonomousSeams）
+
+- `kAutonomousContinuationPrompt` = `[系统] 自主运营：继续推进当前目标。`；
+- `AutonomousResult`：`{turns, goalsAdvanced, totalCost, stoppedReason}`；`StopReason`：completed / budgetExceeded / windowEnded / maxRoundsReached / humanRequired / manualStop；
+- `AutonomousRunner` 协议：`run()`（同一时刻只允许一次，重复调用抛错）/ `stop()`（中断睡眠等待，run 以 manualStop 收尾）/ `isRunning` / `setPolicy` / `policy`；run 结束后 `_stopped` 复位（runner 可复用）；
+- `AutonomousLoop.iterate(turns, advanced)`：一轮完整迭代——`_earlyStop`（约束检查 + 目标状态）→ 取目标 → `_runTurn`（带单轮时长上限，超时经 AgentCancel 真取消：以 AgentCancelled 上抛、不写事件、迟到结果丢弃，超时轮按空轮记录并审计 `autonomous/turn_timeout`）→ 审计/埋点 → `_humanCheck`（策略外工具或 requireHumanInLoop 时经审批确认，拒绝 → humanRequired）→ `_advanceGoal`（终态/阻塞/暂停不再推进）→ 返回（停止原因, 成本增量）；
+- 硬停止：会话关闭 → manualStop；`cost > dailyBudget` → budgetExceeded；轮次数 ≥ maxContinuousRounds → maxRoundsReached；窗口外且 nextStart 在今天 → 睡眠等待（被 stop 中断 → manualStop），否则 windowEnded；
+- `AutonomousSeams`：集中承载 costTracker / costOfTurn / approval / telemetry / sessionLog 五个可选依赖（缺省降级）；`costDelta`（正增量）/ `turnCost`（costOfTurn 钩子精确折算负值截 0，否则今日增量近似）；`askApproval`（缺省自动批准）；`audit('autonomous/turn', {goalId, priorityScore, replyLength, steps, costDelta})` / `audit('autonomous/finished', ...)` / 埋点 `autonomous.round` / `autonomous.finished`；
+- `provideAutonomousRunner(ctx, agent, goal, session, policy?, costTracker?, costOfTurn?, approval?, telemetry?, sessionLog?)`：服务键 `autonomousRunner`；未显式传入的可选依赖从上下文惰性解析。**注意**：传给 agent 的 AgentLoop 不应挂 goalDriver（续行驱动器与 Runner 轮次记账双算），且应绑定与 session 相同的会话。
+
+### 8.4 定时启动（AutonomousSchedule）
+
+- `autonomousDelivery(runner, onError?)`：到期触发——未在运行时后台跑一轮返回 true；已在运行返回 false（不写 dispatch，记录保持活动）；单轮失败经 onError 上报（缺省静默），不中断后续调度；
+- `provideAutonomousSchedule(ctx, runner, schedule?, clock?, onError?)`：服务键 `autonomousSchedule`（不占用 `scheduleRuntime` 服务键，可与宿主自己的到期投递并存）；依赖 `schedule` 服务；会话上任何 `schedule/change` 事件落盘触发 `requestDrive`（新建提醒无需宿主介入即可定时触发）；装配时立即推导一次；随上下文释放 dispose。
+
+## 9. 有意偏离
 
 （无。）
 

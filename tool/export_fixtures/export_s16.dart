@@ -28,6 +28,7 @@ Future<void> main() async {
     'recovery': _recovery,
     'skill': _skill,
     'goal-flow': _goalFlow,
+    'autonomous-flow': _autonomousFlow,
   };
   const JsonEncoder encoder = JsonEncoder.withIndent('  ');
   for (final MapEntry<String, Future<Map<String, Object?>> Function()> entry
@@ -1004,4 +1005,171 @@ Future<Map<String, Object?>> _goalFlow() async {
       'driverModelCalls': driverLlm.calls.length,
     },
   };
+}
+
+// ═══════════════════════ v1.5 增补：autonomous ═══════════════════════
+
+/// autonomous-flow：TimeWindow / PriorityEngine / Runner 停止矩阵（正常完成 /
+/// 预算超限 / 轮次上限 / 运行前停止）。
+Future<Map<String, Object?>> _autonomousFlow() async {
+  final List<Map<String, Object?>> windowCases = <Map<String, Object?>>[];
+  final TimeWindow day = TimeWindow(start: const Duration(hours: 9), end: const Duration(hours: 17));
+  final TimeWindow night = TimeWindow(start: const Duration(hours: 22), end: const Duration(hours: 6));
+  windowCases.add(<String, Object?>{
+    'label': '端点含（09:00 与 17:00 在窗口内）',
+    'expect': <String, Object?>{
+      'at9': day.contains(DateTime(2026, 8, 6, 9, 0)),
+      'at17': day.contains(DateTime(2026, 8, 6, 17, 0)),
+      'at8': day.contains(DateTime(2026, 8, 6, 8, 59)),
+    },
+  });
+  windowCases.add(<String, Object?>{
+    'label': '跨午夜窗口与 nextStart',
+    'expect': <String, Object?>{
+      'at23': night.contains(DateTime(2026, 8, 6, 23, 30)),
+      'at1': night.contains(DateTime(2026, 8, 6, 1, 0)),
+      'at12': night.contains(DateTime(2026, 8, 6, 12, 0)),
+      'nextFrom10': night.nextStart(DateTime(2026, 8, 6, 10, 0)).hour,
+      'nextFrom23': night.nextStart(DateTime(2026, 8, 6, 23, 0)).day,
+    },
+  });
+
+  final List<Map<String, Object?>> priorityCases = <Map<String, Object?>>[];
+  final PriorityEngine engine = PriorityEngine();
+  final Goal low = Goal(id: 'a', text: '低', status: GoalStatus.active, round: 0, maxRounds: 10, createdAt: DateTime(2026), updatedAt: DateTime(2026));
+  final Goal high = Goal(id: 'b', text: '高', status: GoalStatus.active, round: 9, maxRounds: 10, createdAt: DateTime(2026), updatedAt: DateTime(2026));
+  priorityCases.add(<String, Object?>{
+    'label': '默认重要性下 urgency 生效',
+    'expect': <String, Object?>{
+      'scoreA': engine.scoreOf(low).score,
+      'scoreB': engine.scoreOf(high).score,
+      'selected': engine.selectNext(<Goal>[low, high])?.id,
+    },
+  });
+  priorityCases.add(<String, Object?>{
+    'label': 'importance 覆盖',
+    'expect': <String, Object?>{
+      'selected': engine.selectNext(<Goal>[low, high], importance: <String, int>{'a': 10})?.id,
+    },
+  });
+
+  // Runner 停止矩阵（注入固定时钟 2026-08-06 12:00）。
+  final DateTime fixedNow = DateTime(2026, 8, 6, 12);
+  DateTime Function() clock() => () => fixedNow;
+
+  final List<Map<String, Object?>> runnerCases = <Map<String, Object?>>[];
+
+  // 正常完成：maxRounds 2 → 2 轮后 advanceRound 达上限自动 block → humanRequired。
+  {
+    final Session session = Session(id: 'r1');
+    final DefaultGoalService goal = DefaultGoalService(session: session, defaultMaxRounds: 2);
+    await goal.create('自主目标');
+    final _ScriptedProvider llm = _ScriptedProvider(<LlmResult>[_text('回复1'), _text('回复2')]);
+    final AgentLoop agent = AgentLoop(llm: llm, tools: ToolRegistry(), session: session);
+    final DefaultAutonomousRunner runner = DefaultAutonomousRunner(
+      agent: agent,
+      goal: goal,
+      session: session,
+      policy: const DefaultAutonomousPolicy(),
+      clock: clock());
+    final AutonomousResult result = await runner.run();
+    runnerCases.add(<String, Object?>{
+      'label': '正常完成（达轮次上限自动阻塞）',
+      'expect': <String, Object?>{
+        'stoppedReason': result.stoppedReason.name,
+        'turns': result.turns.length,
+        'replies': <String>[for (final AgentTurn t in result.turns) t.reply],
+        'advanced': result.goalsAdvanced.length,
+      },
+    });
+  }
+
+  // 预算超限：todayCost 10 > dailyBudget 5 → 0 轮。
+  {
+    final Session session = Session(id: 'r2');
+    final DefaultGoalService goal = DefaultGoalService(session: session);
+    await goal.create('自主目标');
+    final _ScriptedProvider llm = _ScriptedProvider(<LlmResult>[_text('不该出现')]);
+    final AgentLoop agent = AgentLoop(llm: llm, tools: ToolRegistry(), session: session);
+    final DefaultAutonomousRunner runner = DefaultAutonomousRunner(
+      agent: agent,
+      goal: goal,
+      session: session,
+      policy: const DefaultAutonomousPolicy(dailyBudget: 5),
+      costTracker: _FixedCostTracker(10),
+      clock: clock(),
+    );
+    final AutonomousResult result = await runner.run();
+    runnerCases.add(<String, Object?>{
+      'label': '预算超限',
+      'expect': <String, Object?>{
+        'stoppedReason': result.stoppedReason.name,
+        'turns': result.turns.length,
+      },
+    });
+  }
+
+  // 轮次上限：maxContinuousRounds 2 → 2 轮后 maxRoundsReached。
+  {
+    final Session session = Session(id: 'r3');
+    final DefaultGoalService goal = DefaultGoalService(session: session, defaultMaxRounds: 100);
+    await goal.create('自主目标');
+    final _ScriptedProvider llm = _ScriptedProvider(
+        <LlmResult>[_text('回复1'), _text('回复2'), _text('回复3')]);
+    final AgentLoop agent = AgentLoop(llm: llm, tools: ToolRegistry(), session: session);
+    final DefaultAutonomousRunner runner = DefaultAutonomousRunner(
+      agent: agent,
+      goal: goal,
+      session: session,
+      policy: const DefaultAutonomousPolicy(maxContinuousRounds: 2),
+      clock: clock(),
+    );
+    final AutonomousResult result = await runner.run();
+    runnerCases.add(<String, Object?>{
+      'label': '达到轮次上限',
+      'expect': <String, Object?>{
+        'stoppedReason': result.stoppedReason.name,
+        'turns': result.turns.length,
+      },
+    });
+  }
+
+  // 运行前停止：stop() 取消当次 → 0 轮 manualStop。
+  {
+    final Session session = Session(id: 'r4');
+    final DefaultGoalService goal = DefaultGoalService(session: session);
+    await goal.create('自主目标');
+    final _ScriptedProvider llm = _ScriptedProvider(<LlmResult>[_text('不该出现')]);
+    final AgentLoop agent = AgentLoop(llm: llm, tools: ToolRegistry(), session: session);
+    final DefaultAutonomousRunner runner = DefaultAutonomousRunner(
+      agent: agent,
+      goal: goal,
+      session: session,
+      policy: const DefaultAutonomousPolicy(),
+      clock: clock());
+    runner.stop();
+    final AutonomousResult result = await runner.run();
+    runnerCases.add(<String, Object?>{
+      'label': '运行前停止',
+      'expect': <String, Object?>{
+        'stoppedReason': result.stoppedReason.name,
+        'turns': result.turns.length,
+      },
+    });
+  }
+
+  return <String, Object?>{
+    'name': 'autonomous-flow',
+    'kind': 'autonomous-flow',
+    'windowCases': windowCases,
+    'priorityCases': priorityCases,
+    'runnerCases': runnerCases,
+  };
+}
+
+/// 固定成本追踪器。
+class _FixedCostTracker implements CostTracker {
+  _FixedCostTracker(this.todayCost);
+  @override
+  final double todayCost;
 }

@@ -1,0 +1,75 @@
+{
+  "name": "autonomous-flow",
+  "kind": "autonomous-flow",
+  "windowCases": [
+    {
+      "label": "端点含（09:00 与 17:00 在窗口内）",
+      "expect": {
+        "at9": true,
+        "at17": true,
+        "at8": false
+      }
+    },
+    {
+      "label": "跨午夜窗口与 nextStart",
+      "expect": {
+        "at23": true,
+        "at1": true,
+        "at12": false,
+        "nextFrom10": 22,
+        "nextFrom23": 7
+      }
+    }
+  ],
+  "priorityCases": [
+    {
+      "label": "默认重要性下 urgency 生效",
+      "expect": {
+        "scoreA": 4.2,
+        "scoreB": 4.02,
+        "selected": "a"
+      }
+    },
+    {
+      "label": "importance 覆盖",
+      "expect": {
+        "selected": "a"
+      }
+    }
+  ],
+  "runnerCases": [
+    {
+      "label": "正常完成（达轮次上限自动阻塞）",
+      "expect": {
+        "stoppedReason": "humanRequired",
+        "turns": 2,
+        "replies": [
+          "回复1",
+          "回复2"
+        ],
+        "advanced": 2
+      }
+    },
+    {
+      "label": "预算超限",
+      "expect": {
+        "stoppedReason": "budgetExceeded",
+        "turns": 0
+      }
+    },
+    {
+      "label": "达到轮次上限",
+      "expect": {
+        "stoppedReason": "maxRoundsReached",
+        "turns": 2
+      }
+    },
+    {
+      "label": "运行前停止",
+      "expect": {
+        "stoppedReason": "manualStop",
+        "turns": 0
+      }
+    }
+  ]
+}
