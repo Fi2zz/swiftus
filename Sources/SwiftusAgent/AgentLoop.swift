@@ -68,12 +68,29 @@ public final class AgentLoop {
         config.session
     }
 
+    /// Goal 续行驱动器（规格 S16 §7.4）；非空时，一轮收口后按其决策自动续行。
+    /// 由 provideGoal 在 goal 与 agentLoop 齐备时后置挂载。
+    public var goalDriver: GoalRoundDriver?
+
     /// 跑一轮：从 userInput 到最终文本回复（规格 S16 §4 数据流）。
     ///
     /// cancel 非空时，模型调用、工具执行与路由都与其竞速；取消后本方法以
     /// AgentCancelled 结束（结果丢弃，调用方可立即开始新一轮）。
+    /// 若挂载了 goalDriver，一轮收口后按其决策自动续行：继续则递增轮次并以
+    /// kGoalContinuationPrompt 再跑一轮，直到等待用户或停止为止。
     @discardableResult
     public func run(
+        _ userInput: String,
+        cancel: AgentCancel? = nil,
+        images: [LlmImage] = []
+    ) async throws -> AgentTurn {
+        let turn = try await runOnce(userInput, cancel: cancel, images: images)
+        guard let driver = goalDriver, config.session?.closed != true else { return turn }
+        return try await driver.advance(cancel: cancel) ?? turn
+    }
+
+    /// 单轮实现：从 userInput 到最终文本回复。
+    private func runOnce(
         _ userInput: String,
         cancel: AgentCancel? = nil,
         images: [LlmImage] = []
