@@ -1,0 +1,96 @@
+{
+  "name": "task-tools",
+  "kind": "task-tools",
+  "cases": [
+    {
+      "scenario": "describe",
+      "label": "describeTasks 播报文本（空 / 多任务 / 未开始无时长）",
+      "expect": {
+        "empty": "现在没有任务。",
+        "text": "现在共 3 个任务：\n1. 查机票（进行中，已运行 3 分钟）\n2. npm test（已完成，已运行 42 秒）\n3. 盯快递（已失败）"
+      }
+    },
+    {
+      "scenario": "list",
+      "label": "list_tasks：无过滤列出全部任务",
+      "arguments": {},
+      "expect": {
+        "content": "现在共 3 个任务：\n1. 查机票（进行中，已运行 0 秒）\n2. 盯快递（等待中）\n3. npm test（已完成）",
+        "failed": false
+      }
+    },
+    {
+      "scenario": "list",
+      "label": "list_tasks：按状态过滤",
+      "arguments": {
+        "status": "running"
+      },
+      "expect": {
+        "content": "现在共 1 个任务：\n1. 查机票（进行中，已运行 0 秒）",
+        "failed": false
+      }
+    },
+    {
+      "scenario": "list",
+      "label": "list_tasks：按类型过滤",
+      "arguments": {
+        "kind": "subAgent"
+      },
+      "expect": {
+        "content": "现在共 1 个任务：\n1. 盯快递（等待中）",
+        "failed": false
+      }
+    },
+    {
+      "scenario": "list",
+      "label": "list_tasks：按父任务过滤",
+      "arguments": {
+        "parent_id": "<task-1>"
+      },
+      "expect": {
+        "content": "现在共 1 个任务：\n1. 盯快递（等待中）",
+        "failed": false
+      }
+    },
+    {
+      "scenario": "list",
+      "label": "list_tasks：组合过滤无命中",
+      "arguments": {
+        "status": "paused",
+        "kind": "shell"
+      },
+      "expect": {
+        "content": "现在没有任务。",
+        "failed": false
+      }
+    },
+    {
+      "scenario": "cancel-ok",
+      "label": "cancel_task 成功口语化确认",
+      "expect": {
+        "content": "好的，已取消任务「查机票」。",
+        "isError": false,
+        "status": "cancelled"
+      }
+    },
+    {
+      "scenario": "cancel-missing",
+      "label": "cancel_task 任务不存在返回失败结果",
+      "expect": {
+        "content": "任务 nope 不存在",
+        "isError": true,
+        "code": "not-found"
+      }
+    },
+    {
+      "scenario": "cancel-denied",
+      "label": "cancel_task 审批拒绝时透传 cancelled",
+      "expect": {
+        "content": "用户取消",
+        "isError": true,
+        "code": "cancelled",
+        "status": "pending"
+      }
+    }
+  ]
+}

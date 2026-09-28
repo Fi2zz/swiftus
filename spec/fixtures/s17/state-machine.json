@@ -1,0 +1,246 @@
+{
+  "name": "state-machine",
+  "kind": "state-machine",
+  "cases": [
+    {
+      "scenario": "create",
+      "label": "create 落 pending 并持久化 task/changed 事件",
+      "expect": {
+        "task": {
+          "id": "<task-1>",
+          "kind": "custom",
+          "status": "pending",
+          "description": "查机票",
+          "hasStartedAt": false,
+          "hasFinishedAt": false,
+          "parentTaskId": null,
+          "metadata": {
+            "goalId": "g1"
+          },
+          "hasResult": false,
+          "hasError": false,
+          "result": null
+        },
+        "all": 1,
+        "active": 1,
+        "log": [
+          {
+            "type": "task/changed",
+            "task": {
+              "id": "<task-1>",
+              "kind": "custom",
+              "status": "pending",
+              "description": "查机票",
+              "hasStartedAt": false,
+              "hasFinishedAt": false,
+              "parentTaskId": null,
+              "metadata": {
+                "goalId": "g1"
+              },
+              "hasResult": false,
+              "hasError": false,
+              "result": null,
+              "errorShape": "none"
+            }
+          }
+        ],
+        "telemetry": [
+          "task.created"
+        ]
+      }
+    },
+    {
+      "scenario": "running",
+      "label": "running 自动 startedAt，completed 自动 finishedAt",
+      "expect": {
+        "running": {
+          "id": "<task-1>",
+          "kind": "custom",
+          "status": "running",
+          "description": "x",
+          "hasStartedAt": true,
+          "hasFinishedAt": false,
+          "parentTaskId": null,
+          "metadata": {},
+          "hasResult": false,
+          "hasError": false,
+          "result": null
+        },
+        "done": {
+          "id": "<task-1>",
+          "kind": "custom",
+          "status": "completed",
+          "description": "x",
+          "hasStartedAt": true,
+          "hasFinishedAt": true,
+          "parentTaskId": null,
+          "metadata": {},
+          "hasResult": true,
+          "hasError": false,
+          "result": "ok"
+        },
+        "durationInSeconds": 0,
+        "telemetry": [
+          "task.created",
+          "task.started",
+          "task.completed"
+        ]
+      }
+    },
+    {
+      "scenario": "pause-resume",
+      "label": "暂停与恢复：埋点 task.paused / task.resumed，startedAt 不被覆盖",
+      "expect": {
+        "paused": {
+          "id": "<task-1>",
+          "kind": "custom",
+          "status": "paused",
+          "description": "x",
+          "hasStartedAt": true,
+          "hasFinishedAt": false,
+          "parentTaskId": null,
+          "metadata": {},
+          "hasResult": false,
+          "hasError": false,
+          "result": null
+        },
+        "resumed": {
+          "id": "<task-1>",
+          "kind": "custom",
+          "status": "running",
+          "description": "x",
+          "hasStartedAt": true,
+          "hasFinishedAt": false,
+          "parentTaskId": null,
+          "metadata": {},
+          "hasResult": false,
+          "hasError": false,
+          "result": null
+        },
+        "telemetry": [
+          "task.created",
+          "task.started",
+          "task.paused",
+          "task.resumed"
+        ],
+        "log": [
+          {
+            "type": "task/changed",
+            "task": {
+              "id": "<task-1>",
+              "kind": "custom",
+              "status": "pending",
+              "description": "x",
+              "hasStartedAt": false,
+              "hasFinishedAt": false,
+              "parentTaskId": null,
+              "metadata": {},
+              "hasResult": false,
+              "hasError": false,
+              "result": null,
+              "errorShape": "none"
+            }
+          },
+          {
+            "type": "task/changed",
+            "task": {
+              "id": "<task-1>",
+              "kind": "custom",
+              "status": "running",
+              "description": "x",
+              "hasStartedAt": true,
+              "hasFinishedAt": false,
+              "parentTaskId": null,
+              "metadata": {},
+              "hasResult": false,
+              "hasError": false,
+              "result": null,
+              "errorShape": "none"
+            }
+          },
+          {
+            "type": "task/changed",
+            "task": {
+              "id": "<task-1>",
+              "kind": "custom",
+              "status": "paused",
+              "description": "x",
+              "hasStartedAt": true,
+              "hasFinishedAt": false,
+              "parentTaskId": null,
+              "metadata": {},
+              "hasResult": false,
+              "hasError": false,
+              "result": null,
+              "errorShape": "none"
+            }
+          },
+          {
+            "type": "task/changed",
+            "task": {
+              "id": "<task-1>",
+              "kind": "custom",
+              "status": "running",
+              "description": "x",
+              "hasStartedAt": true,
+              "hasFinishedAt": false,
+              "parentTaskId": null,
+              "metadata": {},
+              "hasResult": false,
+              "hasError": false,
+              "result": null,
+              "errorShape": "none"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "scenario": "terminal-guard",
+      "label": "终态任务不可再更新；未知任务抛 not-found",
+      "expect": {
+        "codes": [
+          "already-terminal",
+          "not-found"
+        ]
+      }
+    },
+    {
+      "scenario": "no-change",
+      "label": "无实际变化的 update 不落盘不埋点",
+      "expect": {
+        "logCount": 1,
+        "telemetry": [
+          "task.created"
+        ],
+        "task": {
+          "id": "<task-1>",
+          "kind": "custom",
+          "status": "pending",
+          "description": "x",
+          "hasStartedAt": false,
+          "hasFinishedAt": false,
+          "parentTaskId": null,
+          "metadata": {},
+          "hasResult": false,
+          "hasError": false,
+          "result": null
+        }
+      }
+    },
+    {
+      "scenario": "dispose",
+      "label": "dispose 幂等，释放后 create / update 抛 disposed",
+      "expect": {
+        "codes": [
+          "disposed",
+          "disposed"
+        ],
+        "telemetry": [
+          "task.created",
+          "task.started"
+        ]
+      }
+    }
+  ]
+}

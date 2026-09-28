@@ -72,17 +72,41 @@ public final class AgentLoop {
     /// 由 provideGoal 在 goal 与 agentLoop 齐备时后置挂载。
     public var goalDriver: GoalRoundDriver?
 
+    /// 每轮生命周期钩子（规格 S17 §5.1；Task Center 等运行时追踪接入）；
+    /// nil 表示不追踪。由 provideTaskTracking 在 agentLoop 可用时后置挂载。
+    public var turnTracker: (any AgentTurnTracker)?
+
     /// 跑一轮：从 userInput 到最终文本回复（规格 S16 §4 数据流）。
     ///
     /// cancel 非空时，模型调用、工具执行与路由都与其竞速；取消后本方法以
     /// AgentCancelled 结束（结果丢弃，调用方可立即开始新一轮）。
     /// 若挂载了 goalDriver，一轮收口后按其决策自动续行：继续则递增轮次并以
     /// kGoalContinuationPrompt 再跑一轮，直到等待用户或停止为止。
+    /// 若挂载了 turnTracker，本方法外套一层追踪外壳：先 beginTurn，成功后
+    /// endTurn(result:)，抛错时 endTurn(error:) 后原样上抛。
     @discardableResult
     public func run(
         _ userInput: String,
         cancel: AgentCancel? = nil,
         images: [LlmImage] = []
+    ) async throws -> AgentTurn {
+        let tracker = turnTracker
+        try await tracker?.beginTurn(userInput)
+        do {
+            let turn = try await continueTurn(userInput, cancel: cancel, images: images)
+            try await tracker?.endTurn(result: .string(turn.reply), error: nil)
+            return turn
+        } catch {
+            try await tracker?.endTurn(result: nil, error: error)
+            throw error
+        }
+    }
+
+    /// run 的追踪外壳主体：单轮加 goalDriver 续行。
+    private func continueTurn(
+        _ userInput: String,
+        cancel: AgentCancel?,
+        images: [LlmImage]
     ) async throws -> AgentTurn {
         let turn = try await runOnce(userInput, cancel: cancel, images: images)
         guard let driver = goalDriver, config.session?.closed != true else { return turn }

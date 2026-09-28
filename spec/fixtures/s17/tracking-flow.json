@@ -1,0 +1,259 @@
+{
+  "name": "tracking-flow",
+  "kind": "tracking-flow",
+  "cases": [
+    {
+      "scenario": "turn-ok",
+      "label": "一轮收口：agentTurn 任务 completed，结果带回复",
+      "expect": {
+        "reply": "你好",
+        "task": {
+          "id": "<task-1>",
+          "kind": "agentTurn",
+          "status": "completed",
+          "description": "处理: 在吗",
+          "hasStartedAt": true,
+          "hasFinishedAt": true,
+          "parentTaskId": null,
+          "metadata": {},
+          "hasResult": true,
+          "hasError": false,
+          "result": "你好"
+        },
+        "currentTurnTaskId": null,
+        "telemetry": [
+          "task.created",
+          "task.started",
+          "task.completed"
+        ]
+      }
+    },
+    {
+      "scenario": "turn-failed",
+      "label": "一轮失败：agentTurn 任务 failed 并带错误",
+      "expect": {
+        "threw": true,
+        "task": {
+          "id": "<task-1>",
+          "kind": "agentTurn",
+          "status": "failed",
+          "description": "处理: hi",
+          "hasStartedAt": true,
+          "hasFinishedAt": true,
+          "parentTaskId": null,
+          "metadata": {},
+          "hasResult": false,
+          "hasError": true,
+          "result": null
+        },
+        "log": [
+          {
+            "type": "task/changed",
+            "task": {
+              "id": "<task-1>",
+              "kind": "agentTurn",
+              "status": "pending",
+              "description": "处理: hi",
+              "hasStartedAt": false,
+              "hasFinishedAt": false,
+              "parentTaskId": null,
+              "metadata": {},
+              "hasResult": false,
+              "hasError": false,
+              "result": null,
+              "errorShape": "none"
+            }
+          },
+          {
+            "type": "task/changed",
+            "task": {
+              "id": "<task-1>",
+              "kind": "agentTurn",
+              "status": "running",
+              "description": "处理: hi",
+              "hasStartedAt": true,
+              "hasFinishedAt": false,
+              "parentTaskId": null,
+              "metadata": {},
+              "hasResult": false,
+              "hasError": false,
+              "result": null,
+              "errorShape": "none"
+            }
+          },
+          {
+            "type": "task/changed",
+            "task": {
+              "id": "<task-1>",
+              "kind": "agentTurn",
+              "status": "failed",
+              "description": "处理: hi",
+              "hasStartedAt": true,
+              "hasFinishedAt": true,
+              "parentTaskId": null,
+              "metadata": {},
+              "hasResult": false,
+              "hasError": true,
+              "result": null,
+              "errorShape": "string"
+            }
+          }
+        ],
+        "telemetry": [
+          "task.created",
+          "task.started",
+          "task.failed"
+        ]
+      }
+    },
+    {
+      "scenario": "spawn-ok",
+      "label": "委托建 subAgent 任务，挂在当前轮次下并落定",
+      "expect": {
+        "toolIsError": false,
+        "turn": {
+          "id": "<task-1>",
+          "kind": "agentTurn",
+          "status": "completed",
+          "description": "处理: 查机票",
+          "hasStartedAt": true,
+          "hasFinishedAt": true,
+          "parentTaskId": null,
+          "metadata": {},
+          "hasResult": true,
+          "hasError": false,
+          "result": "结论：最低 720 元"
+        },
+        "sub": {
+          "id": "<task-2>",
+          "kind": "subAgent",
+          "status": "completed",
+          "description": "子 Agent: 查明天机票",
+          "hasStartedAt": true,
+          "hasFinishedAt": true,
+          "parentTaskId": "<task-1>",
+          "metadata": {
+            "maxRounds": 3
+          },
+          "hasResult": true,
+          "hasError": false,
+          "result": {
+            "status": "success",
+            "output": "结论：最低 720 元",
+            "rounds": 0,
+            "tool_calls": []
+          }
+        },
+        "telemetry": [
+          "task.created",
+          "task.started",
+          "task.created",
+          "task.started",
+          "task.completed",
+          "task.completed"
+        ]
+      }
+    },
+    {
+      "scenario": "spawn-failed",
+      "label": "子 Agent 失败时 subAgent 任务 failed（从结果值判定）",
+      "expect": {
+        "toolIsError": false,
+        "sub": {
+          "id": "<task-1>",
+          "kind": "subAgent",
+          "status": "failed",
+          "description": "子 Agent: 必失败",
+          "hasStartedAt": true,
+          "hasFinishedAt": true,
+          "parentTaskId": null,
+          "metadata": {},
+          "hasResult": false,
+          "hasError": true,
+          "result": null
+        },
+        "errorContainsSubFailure": true
+      }
+    },
+    {
+      "scenario": "schedule-delivery",
+      "label": "提醒交付成功 completed，被拒 failed",
+      "expect": {
+        "delivered": [
+          true,
+          false
+        ],
+        "tasks": [
+          {
+            "id": "<task-1>",
+            "kind": "schedule",
+            "status": "completed",
+            "description": "提醒: 该喝水了",
+            "hasStartedAt": true,
+            "hasFinishedAt": true,
+            "parentTaskId": null,
+            "metadata": {},
+            "hasResult": false,
+            "hasError": false,
+            "result": null
+          },
+          {
+            "id": "<task-2>",
+            "kind": "schedule",
+            "status": "failed",
+            "description": "提醒: 该喝水了",
+            "hasStartedAt": true,
+            "hasFinishedAt": true,
+            "parentTaskId": null,
+            "metadata": {},
+            "hasResult": false,
+            "hasError": false,
+            "result": null
+          }
+        ]
+      }
+    },
+    {
+      "scenario": "shell-foreground",
+      "label": "前台执行按退出码落定",
+      "command": "echo hello",
+      "expect": {
+        "exitCode": 0,
+        "task": {
+          "id": "<task-1>",
+          "kind": "shell",
+          "status": "completed",
+          "description": "Shell: echo hello",
+          "hasStartedAt": true,
+          "hasFinishedAt": true,
+          "parentTaskId": null,
+          "metadata": {
+            "command": "echo hello"
+          },
+          "hasResult": true,
+          "hasError": false,
+          "result": {
+            "exitCode": 0
+          }
+        }
+      }
+    },
+    {
+      "scenario": "shell-killed",
+      "label": "后台进程被 kill 落 failed（退出码随平台而异，只比对形态）",
+      "command": "sleep 30",
+      "expect": {
+        "kind": "shell",
+        "status": "failed",
+        "description": "Shell: sleep 30",
+        "metadata": {
+          "command": "sleep 30"
+        },
+        "hasFinishedAt": true,
+        "resultKeys": [
+          "exitCode"
+        ]
+      }
+    }
+  ]
+}

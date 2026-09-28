@@ -113,12 +113,16 @@ public final class DefaultPlanMode: PlanMode {
         if currentState == .active {
             exit()
         }
-        broadcast.withLock { current -> Void in
+        let subscribers: [AsyncStream<PlanModeState>.Continuation] = broadcast.withLock { current in
             current.closed = true
-            for subscriber in current.subscribers.values {
-                subscriber.finish()
-            }
+            let alive = Array(current.subscribers.values)
             current.subscribers.removeAll()
+            return alive
+        }
+            // 锁内只取出订阅者、锁外再 finish：finish() 会同步触发 onTermination，
+            // 而 onTermination 要再进同一把锁（OSAllocatedUnfairLock 不可重入）。
+        for subscriber in subscribers {
+            subscriber.finish()
         }
     }
 

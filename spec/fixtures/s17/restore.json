@@ -1,0 +1,146 @@
+{
+  "name": "restore",
+  "kind": "restore",
+  "cases": [
+    {
+      "scenario": "fold",
+      "label": "按任务 id 折叠最后一个事件",
+      "expect": {
+        "ids": [
+          "t1",
+          "t2"
+        ],
+        "normalized": [
+          {
+            "id": "<task-1>",
+            "kind": "custom",
+            "status": "completed",
+            "description": "查机票",
+            "hasStartedAt": false,
+            "hasFinishedAt": false,
+            "parentTaskId": null,
+            "metadata": {},
+            "hasResult": false,
+            "hasError": false,
+            "result": null
+          },
+          {
+            "id": "<task-2>",
+            "kind": "custom",
+            "status": "pending",
+            "description": "查机票",
+            "hasStartedAt": false,
+            "hasFinishedAt": false,
+            "parentTaskId": null,
+            "metadata": {},
+            "hasResult": false,
+            "hasError": false,
+            "result": null
+          }
+        ],
+        "statuses": [
+          "completed",
+          "pending"
+        ]
+      }
+    },
+    {
+      "scenario": "fork",
+      "label": "fork 不继承：只折叠会话自身后缀",
+      "expect": {
+        "forked": 0,
+        "parent": 1
+      }
+    },
+    {
+      "scenario": "auto-restore",
+      "label": "构造时自动恢复：未完成任务标记 failed",
+      "expect": {
+        "stale": {
+          "id": "<task-1>",
+          "kind": "shell",
+          "status": "failed",
+          "description": "sleep 100",
+          "hasStartedAt": true,
+          "hasFinishedAt": true,
+          "parentTaskId": null,
+          "metadata": {},
+          "hasResult": false,
+          "hasError": true,
+          "result": null
+        },
+        "done": {
+          "id": "<task-2>",
+          "kind": "custom",
+          "status": "completed",
+          "description": "x",
+          "hasStartedAt": false,
+          "hasFinishedAt": false,
+          "parentTaskId": null,
+          "metadata": {},
+          "hasResult": false,
+          "hasError": false,
+          "result": null
+        },
+        "staleErrorIsStaleReason": true,
+        "log": [
+          {
+            "type": "task/changed",
+            "task": {
+              "id": "<task-1>",
+              "kind": "shell",
+              "status": "running",
+              "description": "sleep 100",
+              "hasStartedAt": true,
+              "hasFinishedAt": false,
+              "parentTaskId": null,
+              "metadata": {},
+              "hasResult": false,
+              "hasError": false,
+              "result": null,
+              "errorShape": "none"
+            }
+          },
+          {
+            "type": "task/changed",
+            "task": {
+              "id": "<task-2>",
+              "kind": "custom",
+              "status": "completed",
+              "description": "x",
+              "hasStartedAt": false,
+              "hasFinishedAt": false,
+              "parentTaskId": null,
+              "metadata": {},
+              "hasResult": false,
+              "hasError": false,
+              "result": null,
+              "errorShape": "none"
+            }
+          },
+          {
+            "type": "task/changed",
+            "task": {
+              "id": "<task-1>",
+              "kind": "shell",
+              "status": "failed",
+              "description": "sleep 100",
+              "hasStartedAt": true,
+              "hasFinishedAt": true,
+              "parentTaskId": null,
+              "metadata": {},
+              "hasResult": false,
+              "hasError": true,
+              "result": null,
+              "errorShape": "string"
+            }
+          }
+        ],
+        "telemetry": [
+          "task.failed"
+        ],
+        "active": 0
+      }
+    }
+  ]
+}

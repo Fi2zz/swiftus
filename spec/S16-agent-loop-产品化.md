@@ -72,6 +72,8 @@ Agent Loop 里替模型跑一次「只允许 plan_write」的规划轮：
 
 `run(input)`：写 user 事件 → 压缩窗口 → 组装 system（prompt 段 + 历史摘要 + **当前计划段**）+ 历史消息 → planning 规划轮（可选）→ router 快路径（可选）→ 循环（模型 → 工具（→ 反思重试）→ 回填）→ 收口（写 assistant 事件）。
 
+轮次生命周期钩子（`turnTracker` 端口 + `run` 外壳的 beginTurn / endTurn）随 S17 增补，语义见 `S17-任务中心.md` §5.1；未装配追踪器时数据流与本节完全一致。
+
 ## 5. 观测与缓存（v1.1 增补：telemetry / caching / context-metrics / content-classifier / layered-compaction / eval）
 
 ### 5.1 telemetry（服务键 `telemetry`）

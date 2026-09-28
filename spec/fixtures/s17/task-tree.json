@@ -1,0 +1,200 @@
+{
+  "name": "task-tree",
+  "kind": "task-tree",
+  "cases": [
+    {
+      "scenario": "tree-shape",
+      "label": "childrenOf 只取直接子任务，subtreeOf 栈式深度优先含自己",
+      "expect": {
+        "childrenOfRoot": [
+          {
+            "id": "<task-2>",
+            "kind": "subAgent",
+            "status": "pending",
+            "description": "a",
+            "hasStartedAt": false,
+            "hasFinishedAt": false,
+            "parentTaskId": "<task-1>",
+            "metadata": {},
+            "hasResult": false,
+            "hasError": false,
+            "result": null
+          },
+          {
+            "id": "<task-3>",
+            "kind": "shell",
+            "status": "pending",
+            "description": "b",
+            "hasStartedAt": false,
+            "hasFinishedAt": false,
+            "parentTaskId": "<task-1>",
+            "metadata": {},
+            "hasResult": false,
+            "hasError": false,
+            "result": null
+          }
+        ],
+        "childrenOfChildA": [
+          {
+            "id": "<task-4>",
+            "kind": "custom",
+            "status": "pending",
+            "description": "a1",
+            "hasStartedAt": false,
+            "hasFinishedAt": false,
+            "parentTaskId": "<task-2>",
+            "metadata": {},
+            "hasResult": false,
+            "hasError": false,
+            "result": null
+          }
+        ],
+        "subtreeOfRoot": [
+          {
+            "id": "<task-1>",
+            "kind": "agentTurn",
+            "status": "pending",
+            "description": "root",
+            "hasStartedAt": false,
+            "hasFinishedAt": false,
+            "parentTaskId": null,
+            "metadata": {},
+            "hasResult": false,
+            "hasError": false,
+            "result": null
+          },
+          {
+            "id": "<task-3>",
+            "kind": "shell",
+            "status": "pending",
+            "description": "b",
+            "hasStartedAt": false,
+            "hasFinishedAt": false,
+            "parentTaskId": "<task-1>",
+            "metadata": {},
+            "hasResult": false,
+            "hasError": false,
+            "result": null
+          },
+          {
+            "id": "<task-2>",
+            "kind": "subAgent",
+            "status": "pending",
+            "description": "a",
+            "hasStartedAt": false,
+            "hasFinishedAt": false,
+            "parentTaskId": "<task-1>",
+            "metadata": {},
+            "hasResult": false,
+            "hasError": false,
+            "result": null
+          },
+          {
+            "id": "<task-4>",
+            "kind": "custom",
+            "status": "pending",
+            "description": "a1",
+            "hasStartedAt": false,
+            "hasFinishedAt": false,
+            "parentTaskId": "<task-2>",
+            "metadata": {},
+            "hasResult": false,
+            "hasError": false,
+            "result": null
+          }
+        ],
+        "subtreeOfMissing": 0,
+        "ids": [
+          "<task-1>",
+          "<task-2>",
+          "<task-3>",
+          "<task-4>"
+        ]
+      }
+    },
+    {
+      "scenario": "cascade-cancel",
+      "label": "级联取消活跃子任务并执行取消回调（已终态子任务不动）",
+      "expect": {
+        "statuses": [
+          "cancelled",
+          "cancelled",
+          "completed"
+        ],
+        "root": {
+          "id": "<task-1>",
+          "kind": "agentTurn",
+          "status": "cancelled",
+          "description": "root",
+          "hasStartedAt": false,
+          "hasFinishedAt": true,
+          "parentTaskId": null,
+          "metadata": {},
+          "hasResult": false,
+          "hasError": false,
+          "result": null
+        },
+        "child": {
+          "id": "<task-2>",
+          "kind": "subAgent",
+          "status": "cancelled",
+          "description": "child",
+          "hasStartedAt": false,
+          "hasFinishedAt": true,
+          "parentTaskId": "<task-1>",
+          "metadata": {},
+          "hasResult": false,
+          "hasError": false,
+          "result": null
+        },
+        "callbackRan": true,
+        "telemetry": [
+          "task.created",
+          "task.created",
+          "task.created",
+          "task.completed",
+          "task.cancelled",
+          "task.cancelled"
+        ]
+      }
+    },
+    {
+      "scenario": "shell-approval",
+      "label": "shell 类任务取消走 approval，拒绝抛 cancelled 且状态不动",
+      "expect": {
+        "deniedCode": "cancelled",
+        "deniedStatus": "pending",
+        "deniedRequests": 1,
+        "grantedStatus": "cancelled",
+        "grantedRequests": 1,
+        "approvalRequest": {
+          "id": "cancel-<task-1>",
+          "toolName": "cancel_task",
+          "arguments": {
+            "id": "<task-1>",
+            "description": "sleep 1"
+          },
+          "description": "取消任务「sleep 1」？"
+        }
+      }
+    },
+    {
+      "scenario": "non-shell",
+      "label": "非 shell 类任务不经 approval",
+      "expect": {
+        "status": "cancelled",
+        "requests": 0
+      }
+    },
+    {
+      "scenario": "cancel-guards",
+      "label": "终态任务再取消抛 already-terminal；未知任务抛 not-found",
+      "expect": {
+        "codes": [
+          "already-terminal",
+          "not-found"
+        ]
+      }
+    }
+  ]
+}

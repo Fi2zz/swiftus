@@ -1,0 +1,144 @@
+{
+  "name": "task-json",
+  "kind": "task-json",
+  "cases": [
+    {
+      "scenario": "status-matrix",
+      "label": "终态与活跃矩阵",
+      "cases": [
+        {
+          "status": "pending",
+          "isTerminal": false,
+          "isActive": true
+        },
+        {
+          "status": "running",
+          "isTerminal": false,
+          "isActive": true
+        },
+        {
+          "status": "paused",
+          "isTerminal": false,
+          "isActive": true
+        },
+        {
+          "status": "completed",
+          "isTerminal": true,
+          "isActive": false
+        },
+        {
+          "status": "failed",
+          "isTerminal": true,
+          "isActive": false
+        },
+        {
+          "status": "cancelled",
+          "isTerminal": true,
+          "isActive": false
+        }
+      ]
+    },
+    {
+      "scenario": "copy-with",
+      "label": "copyWith 未传参保持原值、传 null 清除可空字段",
+      "expect": {
+        "keptResult": "ok",
+        "keptError": "oops",
+        "keptStartedAt": true,
+        "clearedResult": null,
+        "clearedError": null,
+        "originalResult": "ok",
+        "originalError": "oops"
+      }
+    },
+    {
+      "scenario": "round-trip",
+      "label": "toJson / fromJson 往返一致",
+      "input": {
+        "id": "t9",
+        "kind": "subAgent",
+        "status": "failed",
+        "description": "子 Agent: 查机票",
+        "createdAt": "2026-09-17T10:00:00.123Z",
+        "startedAt": "2026-09-17T10:01:00.000Z",
+        "finishedAt": "2026-09-17T10:02:00.000Z",
+        "parentTaskId": "parent-1",
+        "metadata": {
+          "goalId": "g1",
+          "maxRounds": 3
+        },
+        "result": {
+          "exitCode": 0
+        },
+        "error": "超时"
+      },
+      "expect": {
+        "id": "t9",
+        "kind": "subAgent",
+        "status": "failed",
+        "description": "子 Agent: 查机票",
+        "createdAt": "2026-09-17T10:00:00.123Z",
+        "startedAt": "2026-09-17T10:01:00.000Z",
+        "finishedAt": "2026-09-17T10:02:00.000Z",
+        "parentTaskId": "parent-1",
+        "metadata": {
+          "goalId": "g1",
+          "maxRounds": 3
+        },
+        "result": {
+          "exitCode": 0
+        },
+        "error": "超时",
+        "durationInSeconds": 60,
+        "isTerminal": true
+      }
+    },
+    {
+      "scenario": "tolerant-enums",
+      "label": "宽容解析：未知枚举回退",
+      "input": {
+        "id": "x",
+        "kind": "nonsense",
+        "status": "weird",
+        "description": "d",
+        "createdAt": "2026-09-17T10:00:00.000Z"
+      },
+      "expect": {
+        "id": "x",
+        "kind": "custom",
+        "status": "pending",
+        "description": "d",
+        "hasStartedAt": false,
+        "hasFinishedAt": false,
+        "metadata": {}
+      }
+    },
+    {
+      "scenario": "tolerant-instants",
+      "label": "宽容解析：非法可选时刻按 nil，metadata 保留键值",
+      "input": {
+        "id": "y",
+        "kind": "shell",
+        "status": "running",
+        "description": "sleep 100",
+        "createdAt": "2026-09-17T10:00:00.000Z",
+        "startedAt": "not-a-date",
+        "finishedAt": "nope",
+        "metadata": {
+          "command": "sleep 100"
+        }
+      },
+      "expect": {
+        "id": "y",
+        "kind": "shell",
+        "status": "running",
+        "description": "sleep 100",
+        "hasStartedAt": false,
+        "hasFinishedAt": false,
+        "metadata": {
+          "command": "sleep 100"
+        }
+      }
+    }
+  ]
+}

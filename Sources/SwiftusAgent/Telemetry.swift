@@ -101,13 +101,17 @@ public final class InMemoryTelemetry: Telemetry {
 
     /// 关闭广播流。幂等。
     public func close() {
-        state.withLock { current in
-            guard !current.closed else { return }
+        let subscribers: [AsyncStream<TelemetryEvent>.Continuation] = state.withLock { current in
+            guard !current.closed else { return [] }
             current.closed = true
-            for subscriber in current.subscribers.values {
-                subscriber.finish()
-            }
+            let alive = Array(current.subscribers.values)
             current.subscribers.removeAll()
+            return alive
+        }
+            // 锁内只取出订阅者、锁外再 finish：finish() 会同步触发 onTermination，
+            // 而 onTermination 要再进同一把锁（OSAllocatedUnfairLock 不可重入）。
+        for subscriber in subscribers {
+            subscriber.finish()
         }
     }
 }
