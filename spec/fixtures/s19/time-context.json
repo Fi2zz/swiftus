@@ -1,0 +1,75 @@
+{
+  "name": "time-context",
+  "kind": "time-context",
+  "cases": [
+    {
+      "label": "UTC 时刻 + 显示名覆盖：名字用覆盖值、偏移取时刻自身",
+      "input": {
+        "instant": "2026-03-09T00:00:00Z",
+        "zoneName": "Asia/Shanghai",
+        "offsetSeconds": 0
+      },
+      "expect": {
+        "name": "time",
+        "isFirstContext": true,
+        "text": "[当前时间]\n2026-03-09 周一 · Asia/Shanghai (UTC+00:00)"
+      }
+    },
+    {
+      "label": "UTC 时刻且无显示名覆盖：用时刻自身的时区缩写",
+      "input": {
+        "instant": "2026-12-31T23:30:00Z",
+        "zoneName": null,
+        "offsetSeconds": 0
+      },
+      "expect": {
+        "name": "time",
+        "isFirstContext": true,
+        "text": "[当前时间]\n2026-12-31 周四 · UTC (UTC+00:00)"
+      }
+    },
+    {
+      "label": "UTC 时刻 + IANA 名覆盖：名字透传",
+      "input": {
+        "instant": "2026-01-01T12:00:00Z",
+        "zoneName": "Asia/Kolkata",
+        "offsetSeconds": 0
+      },
+      "expect": {
+        "name": "time",
+        "isFirstContext": true,
+        "text": "[当前时间]\n2026-01-01 周四 · Asia/Kolkata (UTC+00:00)"
+      }
+    },
+    {
+      "label": "UTC 时刻跨年：日期与星期按时刻自身时区（UTC）取值",
+      "input": {
+        "instant": "2026-12-31T23:59:59Z",
+        "zoneName": null,
+        "offsetSeconds": 0
+      },
+      "expect": {
+        "name": "time",
+        "isFirstContext": true,
+        "text": "[当前时间]\n2026-12-31 周四 · UTC (UTC+00:00)"
+      }
+    },
+    {
+      "label": "时区偏移格式化：正负号与补零（含半小时时区）",
+      "input": {
+        "offsets": [
+          28800,
+          -19800,
+          0,
+          1800
+        ]
+      },
+      "expect": {
+        "plus8": "+08:00",
+        "minusHalf": "-05:30",
+        "utc": "+00:00",
+        "plusHalf": "+00:30"
+      }
+    }
+  ]
+}

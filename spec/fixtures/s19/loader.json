@@ -1,0 +1,109 @@
+{
+  "name": "loader",
+  "kind": "loader",
+  "root": "<root>",
+  "cases": [
+    {
+      "scenario": "register",
+      "label": "注册表：空名被拒、同名覆盖、unregister 返回是否真的移除",
+      "expect": {
+        "emptyName": {
+          "error": "插件名不能为空"
+        },
+        "names": [
+          "a"
+        ],
+        "hasA": true,
+        "hasB": false,
+        "unregistered": true,
+        "unregisteredAgain": false
+      }
+    },
+    {
+      "scenario": "load",
+      "label": "load：id 生成与父子前缀、重复 id 与未注册插件被拒且不残留、分组不加载插件",
+      "expect": {
+        "firstIdShape": true,
+        "secondIdShape": true,
+        "distinctIds": true,
+        "groupId": "g",
+        "childIdHasPrefix": true,
+        "idsInLoadOrder": [
+          "entry-2",
+          "g",
+          "g:entry-3"
+        ],
+        "isEmptyFalse": true,
+        "duplicateId": {
+          "error": "entry \"entry-1\" 已存在"
+        },
+        "unknownPlugin": {
+          "error": "未注册的插件 \"nope\"（entry \"nope\"）"
+        },
+        "unknownPluginResidue": false,
+        "groupHasNoContext": true,
+        "entryOfGroupIsGroup": true,
+        "logAfterRemove": [
+          "a:x",
+          "a:y",
+          "a:child",
+          "a:off"
+        ],
+        "idGoneAfterRemove": true,
+        "reloadKeepsSingleContext": false,
+        "reloadUnknown": {
+          "error": "未知 entry \"ghost\""
+        },
+        "removeUnknown": {
+          "error": "未知 entry \"ghost\""
+        }
+      }
+    },
+    {
+      "scenario": "apply",
+      "label": "apply：全量替换——先卸载现有 entry 再按新树加载",
+      "expect": {
+        "ids": [
+          "only"
+        ],
+        "isEmptyFalse": true,
+        "log": [
+          "on:1",
+          "on:2",
+          "off:2",
+          "off:1",
+          "on:3",
+          "off:3"
+        ]
+      }
+    },
+    {
+      "scenario": "config-tree",
+      "label": "配置树：分组递归子节点、禁用项不加载插件但仍登记、entry 可 JSON 往返",
+      "expect": {
+        "ids": [
+          "top",
+          "top:entry-1",
+          "top:entry-2"
+        ],
+        "log": [
+          "on:nested"
+        ],
+        "disabledHasNoContext": false,
+        "groupRoundtrip": {
+          "id": "top",
+          "children": [
+            {
+              "name": "a",
+              "config": "nested"
+            },
+            {
+              "name": "a",
+              "disabled": true
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

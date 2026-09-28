@@ -1,0 +1,83 @@
+{
+  "name": "database-unit",
+  "kind": "database-unit",
+  "root": "<root>",
+  "cases": [
+    {
+      "scenario": "write-chain",
+      "label": "写入链：落盘成功后才更新内存并广播；删除不存在不落盘不广播",
+      "input": {
+        "unit": "u",
+        "puts": [
+          {
+            "key": "name",
+            "value": "助手"
+          },
+          {
+            "key": "empty",
+            "value": null
+          },
+          {
+            "key": "name",
+            "value": "助手二代"
+          }
+        ],
+        "deletes": [
+          "name",
+          "ghost"
+        ]
+      },
+      "expect": {
+        "changes": [
+          {
+            "unit": "u",
+            "key": "name",
+            "kind": "put",
+            "hasValue": true
+          },
+          {
+            "unit": "u",
+            "key": "empty",
+            "kind": "put",
+            "hasValue": false
+          },
+          {
+            "unit": "u",
+            "key": "name",
+            "kind": "put",
+            "hasValue": true
+          },
+          {
+            "unit": "u",
+            "key": "name",
+            "kind": "deleted",
+            "hasValue": false
+          }
+        ],
+        "deleteExisting": true,
+        "deleteMissing": false,
+        "entries": {
+          "empty": null
+        },
+        "keys": [
+          "empty"
+        ],
+        "length": 1,
+        "hasEmptyValue": true,
+        "getMissingIsNull": true
+      }
+    },
+    {
+      "scenario": "close",
+      "label": "close：幂等、清空监听器、关闭后写入抛 unit-closed、已从 hub 摘除",
+      "expect": {
+        "afterClose": {
+          "error": "unit-closed"
+        },
+        "closed": true,
+        "changesAfterClose": 4,
+        "hubUnits": []
+      }
+    }
+  ]
+}

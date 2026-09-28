@@ -1,0 +1,48 @@
+{
+  "name": "database-json",
+  "kind": "database-json",
+  "root": "<root>",
+  "cases": [
+    {
+      "scenario": "roundtrip",
+      "label": "每单元一个人类可读 JSON 文件：不存在返回空表、整表往返、删除后清空",
+      "input": {
+        "unit": "u1",
+        "records": {
+          "a": 1,
+          "b": null
+        }
+      },
+      "expect": {
+        "loadMissing": {},
+        "reloaded": {
+          "a": 1,
+          "b": null
+        },
+        "files": [
+          "u1.json"
+        ],
+        "loadAfterDelete": {}
+      }
+    },
+    {
+      "scenario": "malformed",
+      "label": "非法载荷与非法单元名：非对象内容抛 malformed-medium，含分隔符或空名抛 invalid-unit",
+      "input": {
+        "file": "array.json",
+        "content": "[1, 2]"
+      },
+      "expect": {
+        "malformed": {
+          "error": "malformed-medium"
+        },
+        "slashUnit": {
+          "error": "invalid-unit"
+        },
+        "emptyUnit": {
+          "error": "invalid-unit"
+        }
+      }
+    }
+  ]
+}

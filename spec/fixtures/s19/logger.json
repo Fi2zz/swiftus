@@ -1,0 +1,61 @@
+{
+  "name": "logger",
+  "kind": "logger",
+  "cases": [
+    {
+      "scenario": "level-ring",
+      "label": "低于全局级别的日志被丢弃；最近日志按 recentLimit 环形保留；移除导出器后不再收到",
+      "expect": {
+        "exportedBeforeRemove": 4,
+        "exportedAfterRemove": 4,
+        "removed": true,
+        "removedAgain": false,
+        "recentMessages": [
+          "e2",
+          "e3",
+          "after"
+        ],
+        "recentCount": 3,
+        "exporters": 0
+      }
+    },
+    {
+      "scenario": "named",
+      "label": "命名 logger 记录自己的名字与附加 error / 堆栈；服务方法用 defaultName",
+      "expect": {
+        "records": [
+          {
+            "level": "info",
+            "name": "chat",
+            "message": "会话超时",
+            "hasError": true,
+            "hasStackTrace": true,
+            "hasTime": true
+          },
+          {
+            "level": "error",
+            "name": "root",
+            "message": "根级",
+            "hasError": false,
+            "hasStackTrace": false,
+            "hasTime": true
+          }
+        ]
+      }
+    },
+    {
+      "scenario": "console",
+      "label": "控制台导出器：[标签] 名字  消息；error 追加一个空格；堆栈另起一行；导出器自身级别过滤；showTime 只加时间前缀",
+      "expect": {
+        "lines": [
+          "[D] root  d",
+          "[W] root  w boom",
+          "[E] root  e bad",
+          "trace",
+          "2026-09-28T17:21:29.414366 [I] root  has-time"
+        ],
+        "showTimeAddsIsoPrefix": false
+      }
+    }
+  ]
+}

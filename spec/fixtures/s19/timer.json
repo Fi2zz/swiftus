@@ -1,0 +1,43 @@
+{
+  "name": "timer",
+  "kind": "timer",
+  "cases": [
+    {
+      "scenario": "timeout",
+      "label": "timeout 触发一次；撤销（显式与随上下文释放）后不再触发",
+      "expect": {
+        "firedOnce": 1,
+        "firedAfterExplicitDisposer": 0
+      }
+    },
+    {
+      "scenario": "interval",
+      "label": "interval 周期触发；上下文释放后停止（只断言「发生过多次」与「释放后不再增长」）",
+      "expect": {
+        "tickedMultipleTimes": true,
+        "stoppedAfterDispose": true
+      }
+    },
+    {
+      "scenario": "sleep",
+      "label": "sleep 到点完成；上下文提前释放以错误结束（不悬挂）",
+      "expect": {
+        "slept": true,
+        "interrupted": false,
+        "interruptedIsStateError": null
+      }
+    },
+    {
+      "scenario": "throttle-debounce",
+      "label": "throttle 首次立即执行、窗口内合并并补执行；debounce 连续调用只执行一次；dispose 后不再执行",
+      "expect": {
+        "throttledImmediate": 1,
+        "throttledAfterWindow": 2,
+        "throttledSecondCallRuns": true,
+        "debouncedBeforeWindow": 0,
+        "debouncedAfterWindow": 1,
+        "debouncedOnce": true
+      }
+    }
+  ]
+}

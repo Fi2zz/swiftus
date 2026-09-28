@@ -1,0 +1,76 @@
+{
+  "name": "database-hub",
+  "kind": "database-hub",
+  "root": "<root>",
+  "cases": [
+    {
+      "scenario": "register",
+      "label": "后端按注册顺序列出；重名与空名分别抛 duplicate-backend / invalid-backend",
+      "expect": {
+        "backendNames": [
+          "json",
+          "memory"
+        ],
+        "duplicate": {
+          "error": "duplicate-backend"
+        },
+        "emptyName": {
+          "error": "invalid-backend"
+        },
+        "namesAfterRejects": [
+          "json",
+          "memory"
+        ]
+      }
+    },
+    {
+      "scenario": "route",
+      "label": "后端路由：显式名 > 缺省名 > 唯一已注册；未注册与不唯一各抛对应码",
+      "expect": {
+        "explicitBackendUnit": "u1",
+        "defaultBackendUnit": "u2",
+        "unknownBackend": {
+          "error": "backend-not-found"
+        },
+        "ambiguous": {
+          "error": "no-backend"
+        },
+        "soleRegisteredUnit": "u"
+      }
+    },
+    {
+      "scenario": "open",
+      "label": "open：已打开与空名被拒、单元按打开顺序列出、close 返回是否真的关闭、closeAll 全收",
+      "expect": {
+        "unitsBeforeClose": [
+          "profile",
+          "scratch"
+        ],
+        "alreadyOpen": {
+          "error": "already-open"
+        },
+        "emptyUnit": {
+          "error": "invalid-unit"
+        },
+        "getFound": "profile",
+        "getMissing": null,
+        "closeOne": true,
+        "closeGhost": false,
+        "unitClosedAfterHubClose": true,
+        "unitClosedAfterCloseAll": true,
+        "lengthAfterCloseAll": 0,
+        "unitsAfterCloseAll": []
+      }
+    },
+    {
+      "scenario": "disposer",
+      "label": "撤销函数幂等，且只撤销自己注册的那次（不误删同名重注册的后端）",
+      "expect": {
+        "namesAfterSwap": [
+          "b"
+        ],
+        "stillResolvable": "present"
+      }
+    }
+  ]
+}
