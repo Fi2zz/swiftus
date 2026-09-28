@@ -1,0 +1,33 @@
+{
+  "name": "router-flow",
+  "kind": "router-flow",
+  "cases": [
+    {
+      "label": "reply 直答不调模型",
+      "expect": {
+        "reply": "本地直答",
+        "modelCalls": 0
+      }
+    },
+    {
+      "label": "tools 预置执行后模型收口",
+      "expect": {
+        "reply": "现在是 12:00",
+        "modelCalls": 1,
+        "lastRoles": [
+          "system",
+          "assistant",
+          "tool"
+        ],
+        "toolContent": "12:00"
+      }
+    },
+    {
+      "label": "pass 落模型",
+      "expect": {
+        "reply": "模型回答",
+        "modelCalls": 1
+      }
+    }
+  ]
+}

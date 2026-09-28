@@ -1,0 +1,30 @@
+{
+  "name": "planning-phase",
+  "kind": "planning-phase",
+  "cases": [
+    {
+      "label": "先规划后执行",
+      "expect": {
+        "reply": "12:00",
+        "modelCalls": 2,
+        "firstCallTools": [
+          "plan_write"
+        ],
+        "planGoal": "报时",
+        "systemHasPlan": true,
+        "eventTypes": [
+          "user/message",
+          "plan/updated",
+          "assistant/message"
+        ]
+      }
+    },
+    {
+      "label": "未注册 plan_write 不跑规划轮",
+      "expect": {
+        "reply": "直接回答",
+        "modelCalls": 1
+      }
+    }
+  ]
+}

@@ -1,0 +1,114 @@
+{
+  "name": "reflection",
+  "kind": "reflection",
+  "decisionCases": [
+    {
+      "input": "{\"decision\":\"retry\",\"reason\":\"x\"}",
+      "expect": "retry"
+    },
+    {
+      "input": "{\"decision\": \"Replan\"}",
+      "expect": "replan"
+    },
+    {
+      "input": "先 retry 再说",
+      "expect": "retry"
+    },
+    {
+      "input": "replan",
+      "expect": "replan"
+    },
+    {
+      "input": "看起来没问题",
+      "expect": "continueRun"
+    }
+  ],
+  "shouldReflectCases": [
+    {
+      "strategy": "always",
+      "risk": "low",
+      "failed": false,
+      "expect": true
+    },
+    {
+      "strategy": "always",
+      "risk": "low",
+      "failed": true,
+      "expect": true
+    },
+    {
+      "strategy": "always",
+      "risk": "medium",
+      "failed": false,
+      "expect": true
+    },
+    {
+      "strategy": "onError",
+      "risk": "low",
+      "failed": false,
+      "expect": false
+    },
+    {
+      "strategy": "onError",
+      "risk": "low",
+      "failed": true,
+      "expect": true
+    },
+    {
+      "strategy": "onError",
+      "risk": "medium",
+      "failed": false,
+      "expect": false
+    },
+    {
+      "strategy": "onRisk",
+      "risk": "low",
+      "failed": false,
+      "expect": false
+    },
+    {
+      "strategy": "onRisk",
+      "risk": "low",
+      "failed": true,
+      "expect": false
+    },
+    {
+      "strategy": "onRisk",
+      "risk": "medium",
+      "failed": false,
+      "expect": true
+    },
+    {
+      "strategy": "never",
+      "risk": "low",
+      "failed": false,
+      "expect": false
+    },
+    {
+      "strategy": "never",
+      "risk": "low",
+      "failed": true,
+      "expect": false
+    },
+    {
+      "strategy": "never",
+      "risk": "medium",
+      "failed": false,
+      "expect": false
+    }
+  ],
+  "retryCase": {
+    "expect": {
+      "invocations": 1,
+      "content": "ok",
+      "reflectCalls": 1
+    }
+  },
+  "replanCase": {
+    "expect": {
+      "invocations": 0,
+      "replanned": true,
+      "content": "bad"
+    }
+  }
+}

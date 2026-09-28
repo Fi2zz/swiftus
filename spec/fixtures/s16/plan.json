@@ -1,0 +1,66 @@
+{
+  "name": "plan",
+  "kind": "plan",
+  "cases": [
+    {
+      "label": "写入并读取（空步骤跳过，id 跳号）",
+      "expect": {
+        "content": "目标：写一份报告\n1. [ ] 收集资料\n2. [ ] 撰写\n3. [ ] 校对",
+        "value": {
+          "goal": "写一份报告",
+          "steps": [
+            {
+              "id": "s1",
+              "text": "收集资料",
+              "done": false
+            },
+            {
+              "id": "s3",
+              "text": "撰写",
+              "done": false
+            },
+            {
+              "id": "s4",
+              "text": "校对",
+              "done": false
+            }
+          ]
+        },
+        "plan": {
+          "goal": "写一份报告",
+          "steps": [
+            {
+              "id": "s1",
+              "text": "收集资料",
+              "done": false
+            },
+            {
+              "id": "s3",
+              "text": "撰写",
+              "done": false
+            },
+            {
+              "id": "s4",
+              "text": "校对",
+              "done": false
+            }
+          ]
+        },
+        "section": "[当前计划]\n目标：写一份报告\n1. [ ] 收集资料\n2. [ ] 撰写\n3. [ ] 校对",
+        "eventType": "plan/updated"
+      }
+    },
+    {
+      "label": "两条 plan/updated 取最后一条",
+      "expect": {
+        "goal": "新目标"
+      }
+    },
+    {
+      "label": "无计划时 planSection 为空串",
+      "expect": {
+        "section": ""
+      }
+    }
+  ]
+}
