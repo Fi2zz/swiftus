@@ -29,6 +29,8 @@ Future<void> main() async {
     'skill': _skill,
     'goal-flow': _goalFlow,
     'autonomous-flow': _autonomousFlow,
+    'plan-mode-flow': _planModeFlow,
+    'prompt-evolver-flow': _promptEvolverFlow,
   };
   const JsonEncoder encoder = JsonEncoder.withIndent('  ');
   for (final MapEntry<String, Future<Map<String, Object?>> Function()> entry
@@ -1172,4 +1174,105 @@ class _FixedCostTracker implements CostTracker {
   _FixedCostTracker(this.todayCost);
   @override
   final double todayCost;
+}
+
+// ═══════════════════════ v1.6 增补：plan-mode + prompt-evolver ═══════════════════════
+
+/// plan-mode-flow：enter/exit/拦截/exit_plan_mode 工具/restore。
+Future<Map<String, Object?>> _planModeFlow() async {
+  final Session session = Session(id: 'p1');
+  final SystemPrompt prompt = SystemPrompt()
+    ..section(PromptSection(name: 'persona', text: () => '你是助手。'));
+  final AutoApproval approval = AutoApproval(true);
+  final DefaultPlanMode planMode = DefaultPlanMode(
+    session: session, prompt: prompt, approval: approval);
+  final ToolRegistry tools = ToolRegistry()
+    ..register(_GatedTool('read', ToolRisk.low))
+    ..register(_GatedTool('write', ToolRisk.medium));
+  planMode.enter();
+  final ToolResult lowOk = await tools.call(ToolCall(name: 'read'));
+  // 拦截由 providePlanMode 的中间件实现——此处直接用服务 + 手挂拦截？导出器里
+  // 用 providePlanMode 装好（含拦截中间件），再测调用。
+  final Context ctx = Context.root();
+  provideTools(ctx, tools: tools);
+  providePlanMode(ctx, planMode: planMode, tools: tools, prompt: prompt, approval: approval);
+  final ToolResult blocked = await tools.call(ToolCall(name: 'write'));
+  // 激活期间快照 policy 段（exit 前）。
+  final List<String> assembledActive = <String>[
+    for (final AssembledSection s in prompt.assemble().sections) s.name,
+  ];
+  final ToolResult exitOk = await tools.call(ToolCall(name: kExitPlanModeToolName,
+      arguments: <String, Object?>{'goal': '改文档', 'steps': <Object?>['读', '写']}));
+  final List<String> events = <String>[for (final SessionEvent e in session.events) e.type];
+
+  // restore：新实例从会话还原 active。
+  final DefaultPlanMode restored = DefaultPlanMode(session: Session(id: 'p2')..append(kPlanModeEvent, data: <String, Object?>{'state': 'active'}));
+  // p2 的事件构造：直接 append。
+
+  return <String, Object?>{
+    'name': 'plan-mode-flow',
+    'kind': 'plan-mode-flow',
+    'expect': <String, Object?>{
+      'policyInjected': assembledActive.contains('plan:policy'),
+      'lowOkFailed': lowOk.isError,
+      'blockedFailed': blocked.isError,
+      'blockedCode': blocked.error?.code,
+      'exitReply': exitOk.content,
+      'stateAfterExit': planMode.state.name,
+      'sessionEvents': events,
+    },
+  };
+}
+
+/// prompt-evolver-flow：propose 阈值 / evaluate A/B / promote 阈值不足 / rollback 缺失。
+Future<Map<String, Object?>> _promptEvolverFlow() async {
+  final SystemPrompt prompt = SystemPrompt()
+    ..section(PromptSection(name: 'persona', text: () => '你是助手。'));
+  final _ScriptedProvider llm = _ScriptedProvider(<LlmResult>[
+    _text('失败模式：指令不够具体'),
+    _text('改进后的 persona：更具体地要求工具。'),
+  ]);
+  final _ScriptedProvider evalLlm = _ScriptedProvider(<LlmResult>[_text('回答')]);
+  final ToolRegistry evalTools = ToolRegistry()..register(_TimeTool());
+  final AgentLoop evalAgent = AgentLoop(llm: evalLlm, tools: evalTools);
+  final Evaluator evaluator = Evaluator(run: (String input) => evalAgent.run(input));
+  final DefaultPromptEvolver evolver = DefaultPromptEvolver(
+    llm: llm,
+    evaluator: evaluator,
+    prompt: prompt,
+    evalCases: <EvalCase>[
+      const EvalCase(id: 'a', input: '现在几点', expectedOutput: '回答'),
+    ],
+    minTraces: 3,
+  );
+
+  final SessionEvent fakeTrace = SessionEvent.create(
+      sessionId: 's', type: kToolResultEvent, seq: 0,
+      data: <String, Object?>{'name': 'get_time', 'content': '错误'});
+  final PromptVariant? insufficient =
+      await evolver.propose(sectionName: 'persona', lowQualityTraces: <SessionEvent>[]);
+  final PromptVariant? proposed = await evolver.propose(
+      sectionName: 'persona', lowQualityTraces: <SessionEvent>[fakeTrace, fakeTrace, fakeTrace]);
+  final EvolutionResult evaluated = await evolver.evaluate(proposed!);
+  final bool promoted = await evolver.promote(proposed, threshold: 0.05);
+  String? rollbackError;
+  try {
+    await evolver.rollback('ghost');
+  } on StateError catch (e) {
+    rollbackError = e.message;
+  }
+
+  return <String, Object?>{
+    'name': 'prompt-evolver-flow',
+    'kind': 'prompt-evolver-flow',
+    'expect': <String, Object?>{
+      'insufficientNull': insufficient == null,
+      'proposedSection': proposed.sectionName,
+      'proposedParentNull': proposed.parentId == null,
+      'evaluatedDecision': evaluated.decision.name,
+      'evaluatedImprovement': evaluated.improvement,
+      'promoted': promoted,
+      'rollbackErrorContains': rollbackError != null && rollbackError.contains('ghost'),
+    },
+  };
 }

@@ -237,7 +237,45 @@ Agent Loop 里替模型跑一次「只允许 plan_write」的规划轮：
 - `autonomousDelivery(runner, onError?)`：到期触发——未在运行时后台跑一轮返回 true；已在运行返回 false（不写 dispatch，记录保持活动）；单轮失败经 onError 上报（缺省静默），不中断后续调度；
 - `provideAutonomousSchedule(ctx, runner, schedule?, clock?, onError?)`：服务键 `autonomousSchedule`（不占用 `scheduleRuntime` 服务键，可与宿主自己的到期投递并存）；依赖 `schedule` 服务；会话上任何 `schedule/change` 事件落盘触发 `requestDrive`（新建提醒无需宿主介入即可定时触发）；装配时立即推导一次；随上下文释放 dispose。
 
-## 9. 有意偏离
+## 9. Plan Mode（v1.6 增补）
+
+### 9.1 词汇与事件协议
+
+- `plan/mode` 事件：状态持久化到会话（append-only，折叠最后一条）；派生只折叠 `ownEvents`（fork 不继承）；
+- `kPlanModePolicy` 段文本（`plan:policy`，order 100）：`You are in plan mode. Use web_search and ask_user to gather information before presenting a complete plan through exit_plan_mode. Do not execute mutating operations until the plan is approved.`（只提 web_search 与 ask_user，不提读本地文件——语音优先场景）；
+- `PlanModeState`：inactive / active；`restorePlanModeState`（倒序取最后一条 plan/mode，state == active 判 active）。
+
+### 9.2 PlanMode 服务与默认实现
+
+- `PlanMode`：`state` / `enter()` / `exit()` / `submitPlan(plan) async -> Bool` / `changes` 流 / `dispose()`；
+- `DefaultPlanMode` 四缝（session / systemPrompt / approval / telemetry，缺省降级）：构造时若 session 还原为 active 则立即 attachPolicy；`enter`（幂等：attachPolicy → 写 active 事件 → 广播 → `plan.entered`）；`exit`（撤销段 → 写 inactive → 广播 → `plan.exited`）；`submitPlan`（approval 缺省自动批准，走 `requestPlan`，先发 `plan.submitted`）；`dispose`（active 时先 exit）；
+- `providePlanMode`：提供服务 + 注册 `exit_plan_mode` 工具 + 挂拦截中间件（激活时拒绝 `riskLevel >= medium`：`PLAN_MODE_BLOCKED`，content `Plan mode is active. Please submit a plan through exit_plan_mode first.`，不限制只读工具）。
+
+### 9.3 exit_plan_mode 工具（low）
+
+- 参数 `goal` 必填 + `steps` 数组；steps 逐条 trim、跳过空、id 用**累计** `s1…sn`；
+- `submitPlan` → 批准则 `exit()` 并返回 `Plan approved. Proceeding with execution.`；拒绝保持激活、返回 `Plan rejected. Please revise based on user feedback.`。
+
+## 10. Prompt Evolver（v1.6 增补）
+
+### 10.1 词汇与协议
+
+- `PromptVariant`：`{id, sectionName, text, reason, createdAt, parentId?, score?}`；
+- `PromptStore`：内存权威存档，可选 database 持久化（本刀内存档，database 档位 W3 占位）；`load`（损坏记录跳过）/ `save` / `find` / `all`；
+- `analyzeFailurePatterns(llm, traces)` / `generateVariant(llm, prompt, sectionName, failurePatterns, parentId?)` / `sectionText(prompt, name)`（未注册抛错）——prompt 模板为协议文本；
+- `PromptEvolver`：`propose(sectionName, lowQualityTraces)`（轨迹数 < minTraces 返回 nil）/ `evaluate(variant)` / `promote(variant, threshold = 0.05)` / `rollback(variantId)`（不存在抛错）/ `current` / `history`（创建时间升序）；
+- `EvolutionDecision`：promote / reject / insufficient；`EvolutionResult`：`{decision, variant(带评估得分), baselineScore, variantScore, improvement}`。
+
+### 10.2 默认实现（DefaultPromptEvolver）
+
+- `restore()`：从存档恢复历史，最后一条为 current；
+- `propose`：轨迹不足返回 nil；LLM 分析失败模式 → 生成变体（parentId = current.id）→ `prompt.proposed` 埋点；
+- `evaluate`：预算内用例（`estimateTokens(input)` 累计 ≤ maxBudgetPerRun）A/B——先跑 baseline → 临时 swap 该 section（A/B 评估期间临时替换，**finally 恢复**）→ 跑 variant；improvement = variantRate - baselineRate；decision 按 `_decide`（> 0.05 promote / < -0.02 reject / 否则 insufficient）；
+- `promote`：improvement < threshold 返回 false；approval 确认（`promote_prompt`，arguments {section, improvement, variant}，description `提示词改进 +X.X%，确认晋升？\n<200 字符预览>`）；通过后 archive 当前 → swap → store.save → current → `prompt.promoted`；
+- `rollback`：find 目标 → archive 当前 → swap → save → current → `prompt.rolled_back`；
+- `providePromptEvolver`：服务键 `promptEvolver`；evaluator / sessionLog / prompt 必需（显式传入）；llm 缺省取上下文 `'llm'`（缺失抛错）；evalCases 缺省为空（此时 evaluate 得 insufficient 因为无用例——passRate 0/0）。
+
+## 11. 有意偏离
 
 （无。）
 

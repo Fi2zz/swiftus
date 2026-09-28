@@ -1,0 +1,16 @@
+{
+  "name": "plan-mode-flow",
+  "kind": "plan-mode-flow",
+  "expect": {
+    "policyInjected": true,
+    "lowOkFailed": false,
+    "blockedFailed": true,
+    "blockedCode": "PLAN_MODE_BLOCKED",
+    "exitReply": "Plan approved. Proceeding with execution.",
+    "stateAfterExit": "inactive",
+    "sessionEvents": [
+      "plan/mode",
+      "plan/mode"
+    ]
+  }
+}

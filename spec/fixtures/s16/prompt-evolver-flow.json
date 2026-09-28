@@ -1,0 +1,13 @@
+{
+  "name": "prompt-evolver-flow",
+  "kind": "prompt-evolver-flow",
+  "expect": {
+    "insufficientNull": true,
+    "proposedSection": "persona",
+    "proposedParentNull": true,
+    "evaluatedDecision": "insufficient",
+    "evaluatedImprovement": 0.0,
+    "promoted": false,
+    "rollbackErrorContains": true
+  }
+}
