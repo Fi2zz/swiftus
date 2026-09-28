@@ -53,6 +53,7 @@ let package = Package(
         .testTarget(name: "SwiftusLLMTests", dependencies: ["SwiftusLLM", "SwiftusCredentials"]),
         .testTarget(name: "SwiftusFoundationTests", dependencies: ["SwiftusFoundation"]),
         .testTarget(name: "SwiftusCompactionTests", dependencies: ["SwiftusCompaction", "SwiftusFoundation"]),
+        .testTarget(name: "SwiftusScheduleTests", dependencies: ["SwiftusSchedule", "SwiftusFoundation"]),
         .testTarget(name: "SwiftusSkillTests", dependencies: ["SwiftusSkill", "SwiftusFoundation"]),
         .testTarget(name: "SwiftusDemoTests", dependencies: ["SwiftusDemo"]),
     ]
