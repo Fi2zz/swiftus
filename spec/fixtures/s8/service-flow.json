@@ -1,0 +1,59 @@
+{
+  "name": "service-flow",
+  "kind": "service-flow",
+  "now": "2026-08-06T12:00:00.000Z",
+  "expect": {
+    "created": {
+      "id": "schedule-1",
+      "kind": "after",
+      "prompt": "到点了",
+      "afterSeconds": 600,
+      "scheduledAt": "2026-08-06T12:10:00.000Z",
+      "state": "scheduled",
+      "deliveryMode": "session-local"
+    },
+    "listed": [
+      {
+        "id": "schedule-1",
+        "kind": "after",
+        "prompt": "到点了",
+        "afterSeconds": 600,
+        "scheduledAt": "2026-08-06T12:10:00.000Z",
+        "state": "scheduled",
+        "deliveryMode": "session-local"
+      }
+    ],
+    "deleted": {
+      "id": "schedule-1",
+      "deleted": true
+    },
+    "afterDelete": [],
+    "forkedActiveEmpty": true,
+    "log": [
+      {
+        "seq": 0,
+        "type": "schedule/change",
+        "data": {
+          "version": 1,
+          "operation": "create",
+          "schedule": {
+            "id": "schedule-1",
+            "kind": "after",
+            "prompt": "到点了",
+            "afterSeconds": 600,
+            "scheduledAt": "2026-08-06T12:10:00.000Z"
+          }
+        }
+      },
+      {
+        "seq": 1,
+        "type": "schedule/change",
+        "data": {
+          "version": 1,
+          "operation": "delete",
+          "id": "schedule-1"
+        }
+      }
+    ]
+  }
+}

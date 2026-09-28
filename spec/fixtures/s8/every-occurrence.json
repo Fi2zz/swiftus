@@ -1,0 +1,38 @@
+{
+  "name": "every-occurrence",
+  "kind": "every-occurrence",
+  "cases": [
+    {
+      "input": {
+        "scheduledAt": "2026-08-06T12:00:00.000Z",
+        "everySeconds": 300,
+        "acceptedAt": "2026-08-06T12:00:00.000Z"
+      },
+      "expect": {
+        "occurrenceAt": "2026-08-06T12:00:00.000Z",
+        "nextScheduledAt": "2026-08-06T12:05:00.000Z"
+      }
+    },
+    {
+      "input": {
+        "scheduledAt": "2026-08-06T12:00:00.000Z",
+        "everySeconds": 300,
+        "acceptedAt": "2026-08-06T12:07:00.000Z"
+      },
+      "expect": {
+        "occurrenceAt": "2026-08-06T12:05:00.000Z",
+        "nextScheduledAt": "2026-08-06T12:10:00.000Z"
+      }
+    },
+    {
+      "input": {
+        "scheduledAt": "2026-08-06T12:00:00.000Z",
+        "everySeconds": 300,
+        "acceptedAt": "2026-08-06T11:59:00.000Z"
+      },
+      "expect": {
+        "corrupt": "every dispatch cannot precede the active scheduledAt"
+      }
+    }
+  ]
+}

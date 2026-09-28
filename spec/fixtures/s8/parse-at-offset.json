@@ -1,0 +1,72 @@
+{
+  "name": "parse-at-offset",
+  "kind": "parse-at",
+  "cases": [
+    {
+      "input": "2026-08-06T12:00:00+08:00",
+      "expect": {
+        "instant": "2026-08-06T04:00:00.000Z"
+      }
+    },
+    {
+      "input": "2026-08-06T12:00:00-05:30",
+      "expect": {
+        "instant": "2026-08-06T17:30:00.000Z"
+      }
+    },
+    {
+      "input": "2026-08-06T12:00:00.1Z",
+      "expect": {
+        "instant": "2026-08-06T12:00:00.100Z"
+      }
+    },
+    {
+      "input": "2026-08-06T12:00:00+00:00",
+      "expect": {
+        "instant": "2026-08-06T12:00:00.000Z"
+      }
+    },
+    {
+      "input": "2026-08-06T12:00:00",
+      "expect": {
+        "errorCode": "invalid_rule"
+      }
+    },
+    {
+      "input": "2026-08-06 12:00:00Z",
+      "expect": {
+        "errorCode": "invalid_rule"
+      }
+    },
+    {
+      "input": "2026-02-30T12:00:00Z",
+      "expect": {
+        "errorCode": "invalid_rule"
+      }
+    },
+    {
+      "input": "0000-08-06T12:00:00Z",
+      "expect": {
+        "errorCode": "invalid_rule"
+      }
+    },
+    {
+      "input": "2026-08-06T24:00:00Z",
+      "expect": {
+        "errorCode": "invalid_rule"
+      }
+    },
+    {
+      "input": "2026-08-06T12:00:00-00:00",
+      "expect": {
+        "errorCode": "invalid_rule"
+      }
+    },
+    {
+      "input": "2026-08-06T12:00:00+24:00",
+      "expect": {
+        "errorCode": "invalid_rule"
+      }
+    }
+  ]
+}

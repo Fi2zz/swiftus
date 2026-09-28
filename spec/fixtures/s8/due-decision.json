@@ -1,0 +1,94 @@
+{
+  "name": "due-decision",
+  "kind": "due-decision",
+  "cases": [
+    {
+      "label": "一次性到期优先",
+      "active": [
+        {
+          "id": "schedule-1",
+          "kind": "at",
+          "prompt": "到点了",
+          "scheduledAt": "2026-08-06T11:00:00.000Z"
+        },
+        {
+          "id": "schedule-2",
+          "kind": "every",
+          "prompt": "到点了",
+          "everySeconds": 300,
+          "scheduledAt": "2026-08-06T11:00:00.000Z"
+        }
+      ],
+      "now": "2026-08-06T12:00:00.000Z",
+      "expect": {
+        "type": "one-shot",
+        "id": "schedule-1"
+      }
+    },
+    {
+      "label": "every 批次共用决策时点",
+      "active": [
+        {
+          "id": "schedule-1",
+          "kind": "every",
+          "prompt": "到点了",
+          "everySeconds": 300,
+          "scheduledAt": "2026-08-06T11:00:00.000Z"
+        },
+        {
+          "id": "schedule-2",
+          "kind": "every",
+          "prompt": "到点了",
+          "everySeconds": 600,
+          "scheduledAt": "2026-08-06T11:30:00.000Z"
+        }
+      ],
+      "now": "2026-08-06T12:00:00.000Z",
+      "expect": {
+        "type": "every-batch",
+        "acceptedAt": "2026-08-06T12:00:00.000Z",
+        "items": [
+          {
+            "id": "schedule-1",
+            "occurrenceAt": "2026-08-06T12:00:00.000Z"
+          },
+          {
+            "id": "schedule-2",
+            "occurrenceAt": "2026-08-06T12:00:00.000Z"
+          }
+        ]
+      }
+    },
+    {
+      "label": "无到期取最小未来目标",
+      "active": [
+        {
+          "id": "schedule-1",
+          "kind": "at",
+          "prompt": "到点了",
+          "scheduledAt": "2026-08-06T13:00:00.000Z"
+        },
+        {
+          "id": "schedule-2",
+          "kind": "at",
+          "prompt": "到点了",
+          "scheduledAt": "2026-08-06T12:30:00.000Z"
+        }
+      ],
+      "now": "2026-08-06T12:00:00.000Z",
+      "expect": {
+        "type": "wait",
+        "target": "2026-08-06T12:30:00.000Z"
+      }
+    },
+    {
+      "label": "无活动保持静默",
+      "active": [],
+      "now": "2026-08-06T12:00:00.000Z",
+      "expect": {
+        "type": "wait",
+        "target": null
+      }
+    }
+  ]
+}

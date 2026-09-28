@@ -11,4 +11,6 @@ if [[ ! -f "$CONFIG" ]]; then
   exit 1
 fi
 cd "$ROOT"
-dart --packages="$CONFIG" tool/export_fixtures/export_s7.dart
+for script in "$ROOT"/tool/export_fixtures/export_*.dart; do
+  dart --packages="$CONFIG" "$script"
+done

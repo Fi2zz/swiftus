@@ -1,0 +1,82 @@
+{
+  "name": "create-records",
+  "kind": "create-record",
+  "now": "2026-08-06T12:00:00.000Z",
+  "cases": [
+    {
+      "selector": {
+        "afterSeconds": 600
+      },
+      "prompt": " 提醒 ",
+      "expect": {
+        "record": {
+          "id": "schedule-1",
+          "kind": "after",
+          "prompt": "提醒",
+          "afterSeconds": 600,
+          "scheduledAt": "2026-08-06T12:10:00.000Z"
+        }
+      }
+    },
+    {
+      "selector": {
+        "everySeconds": 300
+      },
+      "prompt": " 提醒 ",
+      "expect": {
+        "record": {
+          "id": "schedule-1",
+          "kind": "every",
+          "prompt": "提醒",
+          "everySeconds": 300,
+          "scheduledAt": "2026-08-06T12:05:00.000Z"
+        }
+      }
+    },
+    {
+      "selector": {
+        "everySeconds": 299
+      },
+      "prompt": " 提醒 ",
+      "expect": {
+        "errorCode": "frequency_too_high"
+      }
+    },
+    {
+      "selector": {
+        "afterSeconds": 0
+      },
+      "prompt": " 提醒 ",
+      "expect": {
+        "errorCode": "invalid_rule"
+      }
+    },
+    {
+      "selector": {
+        "at": "2026-08-06T13:00:00+01:00"
+      },
+      "prompt": " 提醒 ",
+      "expect": {
+        "errorCode": "not_future"
+      }
+    },
+    {
+      "selector": {
+        "at": "2026-08-06T12:00:00.000Z"
+      },
+      "prompt": " 提醒 ",
+      "expect": {
+        "errorCode": "not_future"
+      }
+    },
+    {
+      "selector": {
+        "afterSeconds": 60
+      },
+      "prompt": "   ",
+      "expect": {
+        "errorCode": "invalid_prompt"
+      }
+    }
+  ]
+}

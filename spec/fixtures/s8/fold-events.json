@@ -1,0 +1,204 @@
+{
+  "name": "fold-events",
+  "kind": "fold",
+  "cases": [
+    {
+      "label": "创建后活动",
+      "events": [
+        {
+          "version": 1,
+          "operation": "create",
+          "schedule": {
+            "id": "schedule-1",
+            "kind": "after",
+            "prompt": "到点了",
+            "afterSeconds": 600,
+            "scheduledAt": "2026-08-06T12:10:00.000Z"
+          }
+        }
+      ],
+      "expect": {
+        "active": [
+          {
+            "id": "schedule-1",
+            "kind": "after",
+            "prompt": "到点了",
+            "afterSeconds": 600,
+            "scheduledAt": "2026-08-06T12:10:00.000Z"
+          }
+        ],
+        "seenIds": [
+          "schedule-1"
+        ]
+      }
+    },
+    {
+      "label": "创建删除后空,seenIds 保留",
+      "events": [
+        {
+          "version": 1,
+          "operation": "create",
+          "schedule": {
+            "id": "schedule-1",
+            "kind": "after",
+            "prompt": "到点了",
+            "afterSeconds": 600,
+            "scheduledAt": "2026-08-06T12:10:00.000Z"
+          }
+        },
+        {
+          "version": 1,
+          "operation": "delete",
+          "id": "schedule-1"
+        }
+      ],
+      "expect": {
+        "active": [],
+        "seenIds": [
+          "schedule-1"
+        ]
+      }
+    },
+    {
+      "label": "every 派发推进目标",
+      "events": [
+        {
+          "version": 1,
+          "operation": "create",
+          "schedule": {
+            "id": "schedule-2",
+            "kind": "every",
+            "prompt": "到点了",
+            "everySeconds": 300,
+            "scheduledAt": "2026-08-06T12:05:00.000Z"
+          }
+        },
+        {
+          "version": 1,
+          "operation": "dispatch",
+          "id": "schedule-2",
+          "acceptedAt": "2026-08-06T12:07:00.000Z"
+        }
+      ],
+      "expect": {
+        "active": [
+          {
+            "id": "schedule-2",
+            "kind": "every",
+            "prompt": "到点了",
+            "everySeconds": 300,
+            "scheduledAt": "2026-08-06T12:10:00.000Z"
+          }
+        ],
+        "seenIds": [
+          "schedule-2"
+        ]
+      }
+    },
+    {
+      "label": "id 复用抛 corrupt",
+      "events": [
+        {
+          "version": 1,
+          "operation": "create",
+          "schedule": {
+            "id": "schedule-1",
+            "kind": "after",
+            "prompt": "到点了",
+            "afterSeconds": 600,
+            "scheduledAt": "2026-08-06T12:10:00.000Z"
+          }
+        },
+        {
+          "version": 1,
+          "operation": "create",
+          "schedule": {
+            "id": "schedule-1",
+            "kind": "after",
+            "prompt": "到点了",
+            "afterSeconds": 600,
+            "scheduledAt": "2026-08-06T12:10:00.000Z"
+          }
+        }
+      ],
+      "expect": {
+        "corrupt": "schedule id \"schedule-1\" was reused"
+      }
+    },
+    {
+      "label": "删除非活动 id 抛 corrupt",
+      "events": [
+        {
+          "version": 1,
+          "operation": "delete",
+          "id": "ghost"
+        }
+      ],
+      "expect": {
+        "corrupt": "schedule delete targets inactive id \"ghost\""
+      }
+    },
+    {
+      "label": "一次性派发带 acceptedAt 抛 corrupt",
+      "events": [
+        {
+          "version": 1,
+          "operation": "create",
+          "schedule": {
+            "id": "schedule-1",
+            "kind": "after",
+            "prompt": "到点了",
+            "afterSeconds": 600,
+            "scheduledAt": "2026-08-06T12:10:00.000Z"
+          }
+        },
+        {
+          "version": 1,
+          "operation": "dispatch",
+          "id": "schedule-1",
+          "acceptedAt": "2026-08-06T12:10:00.000Z"
+        }
+      ],
+      "expect": {
+        "corrupt": "one-shot dispatch must not contain acceptedAt"
+      }
+    },
+    {
+      "label": "every 派发缺 acceptedAt 抛 corrupt",
+      "events": [
+        {
+          "version": 1,
+          "operation": "create",
+          "schedule": {
+            "id": "schedule-2",
+            "kind": "every",
+            "prompt": "到点了",
+            "everySeconds": 300,
+            "scheduledAt": "2026-08-06T12:05:00.000Z"
+          }
+        },
+        {
+          "version": 1,
+          "operation": "dispatch",
+          "id": "schedule-2"
+        }
+      ],
+      "expect": {
+        "corrupt": "every dispatch must contain acceptedAt"
+      }
+    },
+    {
+      "label": "未知版本抛 corrupt",
+      "events": [
+        {
+          "version": 2,
+          "operation": "delete",
+          "id": "x"
+        }
+      ],
+      "expect": {
+        "corrupt": "schedule/change version must be 1"
+      }
+    }
+  ]
+}

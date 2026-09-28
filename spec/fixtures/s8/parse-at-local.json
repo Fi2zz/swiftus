@@ -1,0 +1,115 @@
+{
+  "name": "parse-at-local",
+  "kind": "parse-at",
+  "cases": [
+    {
+      "input": {
+        "date": "2026-08-06",
+        "time": "12:00:00",
+        "time_zone": "UTC"
+      },
+      "expect": {
+        "instant": "2026-08-06T12:00:00.000Z"
+      }
+    },
+    {
+      "input": {
+        "date": "2026-08-06",
+        "time": "12:00:00",
+        "time_zone": "Asia/Shanghai"
+      },
+      "expect": {
+        "instant": "2026-08-06T04:00:00.000Z"
+      }
+    },
+    {
+      "input": {
+        "date": "2026-11-01",
+        "time": "01:30:00",
+        "time_zone": "America/New_York"
+      },
+      "expect": {
+        "instant": "2026-11-01T05:30:00.000Z"
+      }
+    },
+    {
+      "input": {
+        "date": "2026-03-08",
+        "time": "02:30:00",
+        "time_zone": "America/New_York"
+      },
+      "expect": {
+        "errorCode": "invalid_rule"
+      }
+    },
+    {
+      "input": {
+        "date": "2026-08-06",
+        "time": "12:00:00",
+        "time_zone": "CST"
+      },
+      "expect": {
+        "errorCode": "invalid_time_zone"
+      }
+    },
+    {
+      "input": {
+        "date": "2026-08-06",
+        "time": "12:00:00",
+        "time_zone": "GMT"
+      },
+      "expect": {
+        "errorCode": "invalid_time_zone"
+      }
+    },
+    {
+      "input": {
+        "date": "2026-08-06",
+        "time": "12:00:00",
+        "time_zone": " Asia/Shanghai"
+      },
+      "expect": {
+        "errorCode": "invalid_time_zone"
+      }
+    },
+    {
+      "input": {
+        "date": "2026-08-06",
+        "time": "12:00:00",
+        "time_zone": "Nope/Nowhere"
+      },
+      "expect": {
+        "errorCode": "invalid_time_zone"
+      }
+    },
+    {
+      "input": {
+        "date": "2026-08-06",
+        "time": "12:00:00"
+      },
+      "expect": {
+        "errorCode": "invalid_rule"
+      }
+    },
+    {
+      "input": {
+        "date": "2026-8-6",
+        "time": "12:00:00",
+        "time_zone": "UTC"
+      },
+      "expect": {
+        "errorCode": "invalid_rule"
+      }
+    },
+    {
+      "input": {
+        "date": "2026-02-30",
+        "time": "12:00:00",
+        "time_zone": "UTC"
+      },
+      "expect": {
+        "errorCode": "invalid_rule"
+      }
+    }
+  ]
+}
