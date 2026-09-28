@@ -80,7 +80,7 @@ struct ToolRegistryTests {
         #expect(unknown.content == "未知工具 \"ghost\"")
 
         let registry2 = ToolRegistry()
-        try? registry2.register(EchoTool())
+        _ = try? registry2.register(EchoTool())
         let invalid = await registry2.call(ToolCall(name: "echo", arguments: ["text": .int(1)]))
         #expect(invalid.error?.code == ToolError.Codes.invalidArgs)
         #expect(invalid.content.hasPrefix("参数不合法："))
