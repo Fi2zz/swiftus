@@ -1,0 +1,164 @@
+{
+  "name": "model-visible",
+  "kind": "model-visible",
+  "cases": [
+    {
+      "label": "尾对齐重建通过",
+      "events": [
+        {
+          "seq": 0,
+          "type": "user/message",
+          "time": "2026-08-06T12:00:00.000Z",
+          "data": {
+            "text": "你好"
+          },
+          "id": "evt-u",
+          "sessionId": "s1"
+        },
+        {
+          "seq": 1,
+          "type": "llm/request",
+          "time": "2026-08-06T12:01:00.000Z",
+          "data": {
+            "provider": "scripted",
+            "messages": [
+              {
+                "role": "system",
+                "content": "你是助手。"
+              },
+              {
+                "role": "user",
+                "content": "你好"
+              }
+            ]
+          },
+          "id": "evt-r",
+          "sessionId": "s1"
+        }
+      ],
+      "expect": {
+        "violations": []
+      }
+    },
+    {
+      "label": "请求比日志长",
+      "events": [
+        {
+          "seq": 0,
+          "type": "user/message",
+          "time": "2026-08-06T12:00:00.000Z",
+          "data": {
+            "text": "你好"
+          },
+          "id": "evt-u",
+          "sessionId": "s1"
+        },
+        {
+          "seq": 1,
+          "type": "llm/request",
+          "time": "2026-08-06T12:01:00.000Z",
+          "data": {
+            "provider": "scripted",
+            "messages": [
+              {
+                "role": "user",
+                "content": "你好"
+              },
+              {
+                "role": "user",
+                "content": "没记录的一句"
+              }
+            ]
+          },
+          "id": "evt-r",
+          "sessionId": "s1"
+        }
+      ],
+      "expect": {
+        "violations": [
+          "第 1 条 llm/request 实际发出 2 条会话消息，日志只能重建 1 条"
+        ]
+      }
+    },
+    {
+      "label": "内容不一致",
+      "events": [
+        {
+          "seq": 0,
+          "type": "user/message",
+          "time": "2026-08-06T12:00:00.000Z",
+          "data": {
+            "text": "你好"
+          },
+          "id": "evt-u",
+          "sessionId": "s1"
+        },
+        {
+          "seq": 1,
+          "type": "llm/request",
+          "time": "2026-08-06T12:01:00.000Z",
+          "data": {
+            "provider": "scripted",
+            "messages": [
+              {
+                "role": "user",
+                "content": "再见"
+              }
+            ]
+          },
+          "id": "evt-r",
+          "sessionId": "s1"
+        }
+      ],
+      "expect": {
+        "violations": [
+          "第 1 条 llm/request 的第 0 条会话消息无法从日志重建"
+        ]
+      }
+    },
+    {
+      "label": "压缩摘要请求跳过",
+      "events": [
+        {
+          "seq": 0,
+          "type": "llm/request",
+          "time": "2026-08-06T12:00:00.000Z",
+          "data": {
+            "provider": "scripted",
+            "messages": [
+              {
+                "role": "user",
+                "content": "请把下面这段对话压缩成简洁的中文要点（保留事实、结论与未完成事项）：\nuser: 第0条"
+              }
+            ]
+          },
+          "id": "evt-r",
+          "sessionId": "s1"
+        }
+      ],
+      "expect": {
+        "violations": []
+      }
+    },
+    {
+      "label": "缺 messages 负载",
+      "events": [
+        {
+          "seq": 0,
+          "type": "llm/request",
+          "time": "2026-08-06T12:00:00.000Z",
+          "data": {
+            "provider": "scripted"
+          },
+          "id": "evt-r",
+          "sessionId": "s1"
+        }
+      ],
+      "expect": {
+        "violations": [
+          "第 0 条 llm/request 缺少 messages 负载"
+        ]
+      }
+    }
+  ]
+}

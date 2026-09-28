@@ -1,0 +1,189 @@
+{
+  "name": "agent-loop",
+  "kind": "agent-loop",
+  "input": "算一下 19+23",
+  "expect": {
+    "reply": "19 + 23 = 42，算完了。",
+    "stepCount": 1,
+    "sessionEventTypes": [
+      "user/message",
+      "assistant/message",
+      "tool/result",
+      "assistant/message"
+    ],
+    "log": [
+      {
+        "seq": 0,
+        "type": "user/message",
+        "data": {
+          "text": "算一下 19+23"
+        },
+        "parent": null,
+        "idAlias": "<evt-1>"
+      },
+      {
+        "seq": 1,
+        "type": "llm/request",
+        "data": {
+          "provider": "scripted",
+          "messages": [
+            {
+              "role": "system",
+              "content": "你是一个可靠的助手。需要外部信息或操作时调用工具；否则直接回答。"
+            },
+            {
+              "role": "user",
+              "content": "算一下 19+23"
+            }
+          ],
+          "tools": [
+            {
+              "name": "add",
+              "description": "加法",
+              "parameters": {
+                "type": "object",
+                "properties": {}
+              }
+            }
+          ]
+        },
+        "parent": "<evt-1>",
+        "idAlias": "<evt-2>"
+      },
+      {
+        "seq": 2,
+        "type": "llm/response",
+        "data": {
+          "provider": "scripted",
+          "model": "m",
+          "content": "",
+          "toolCalls": [
+            {
+              "id": "c1",
+              "name": "add",
+              "arguments": "{\"a\":19,\"b\":23}"
+            }
+          ],
+          "usage": {}
+        },
+        "parent": "<evt-2>",
+        "idAlias": "<evt-3>"
+      },
+      {
+        "seq": 3,
+        "type": "assistant/message",
+        "data": {
+          "text": "",
+          "reasoning": "",
+          "toolCalls": [
+            {
+              "id": "c1",
+              "name": "add",
+              "arguments": "{\"a\":19,\"b\":23}"
+            }
+          ]
+        },
+        "parent": "<evt-3>",
+        "idAlias": "<evt-4>"
+      },
+      {
+        "seq": 4,
+        "type": "tool/call",
+        "data": {
+          "name": "add",
+          "callId": "c1",
+          "group": null,
+          "args": {
+            "a": 19,
+            "b": 23
+          }
+        },
+        "parent": "<evt-4>",
+        "idAlias": "<evt-5>"
+      },
+      {
+        "seq": 5,
+        "type": "tool/result",
+        "data": {
+          "callId": "c1",
+          "name": "add",
+          "content": "42",
+          "isError": false
+        },
+        "parent": "<evt-5>",
+        "idAlias": "<evt-6>"
+      },
+      {
+        "seq": 6,
+        "type": "llm/request",
+        "data": {
+          "provider": "scripted",
+          "messages": [
+            {
+              "role": "system",
+              "content": "你是一个可靠的助手。需要外部信息或操作时调用工具；否则直接回答。"
+            },
+            {
+              "role": "user",
+              "content": "算一下 19+23"
+            },
+            {
+              "role": "assistant",
+              "content": "",
+              "tool_calls": [
+                {
+                  "id": "c1",
+                  "type": "function",
+                  "function": {
+                    "name": "add",
+                    "arguments": "{\"a\":19,\"b\":23}"
+                  }
+                }
+              ]
+            },
+            {
+              "role": "tool",
+              "content": "42",
+              "tool_call_id": "c1"
+            }
+          ],
+          "tools": [
+            {
+              "name": "add",
+              "description": "加法",
+              "parameters": {
+                "type": "object",
+                "properties": {}
+              }
+            }
+          ]
+        },
+        "parent": "<evt-6>",
+        "idAlias": "<evt-7>"
+      },
+      {
+        "seq": 7,
+        "type": "llm/response",
+        "data": {
+          "provider": "scripted",
+          "model": "m",
+          "content": "19 + 23 = 42，算完了。",
+          "toolCalls": [],
+          "usage": {}
+        },
+        "parent": "<evt-7>",
+        "idAlias": "<evt-8>"
+      },
+      {
+        "seq": 8,
+        "type": "assistant/message",
+        "data": {
+          "text": "19 + 23 = 42，算完了。"
+        },
+        "parent": "<evt-8>",
+        "idAlias": "<evt-9>"
+      }
+    ],
+    "invariantViolations": []
+  }
+}
