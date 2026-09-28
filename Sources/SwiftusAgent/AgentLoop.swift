@@ -18,6 +18,10 @@ public final class AgentLoop {
         public var systemPrompt: SystemPrompt?
         /// 历史压缩器；nil 表示不压缩。
         public var compactor: (any CompactionEngine)?
+        /// 长记忆库；nil 表示不召回/不记录。
+        public var memory: MemoryStore?
+        /// 每轮召回的长期记忆条数。
+        public var memoryLimit = 5
         /// 工具执行后的自省器；nil 表示不反思。
         public var reflector: Reflector?
         /// 调模型前的确定性路由器；nil 表示不路由（直接落模型）。
@@ -78,12 +82,15 @@ public final class AgentLoop {
         try ensureSessionOpen(session)
         try appendUserEvent(session, input: userInput, images: images)
         try await compactIfConfigured()
+        if let memory = config.memory {
+            try await memory.load()
+        }
         var state = TurnState(messages: initialMessages(userInput))
         try await planIfNeeded(state: &state, userInput: userInput)
         if let router = config.router {
             let routed = try await raceRoute(router, input: userInput, cancel: cancel)
             if case let .reply(text) = routed {
-                return try await finish(state: state, reply: text)
+                return try await finish(state: state, reply: text, userInput: userInput)
             }
             if case let .tools(calls) = routed {
                 try await runPrepared(calls, state: &state, cancel: cancel)
@@ -110,13 +117,13 @@ public final class AgentLoop {
             ])
             if result.toolCalls.isEmpty {
                 let reply = result.content.trimmingCharacters(in: .whitespacesAndNewlines)
-                return try await finish(state: state, reply: reply)
+                return try await finish(state: state, reply: reply, userInput: userInput)
             }
             state.messages.append(assistantMessage(result))
             try appendAssistantEvent(config.session, result: result)
             try await runToolCalls(result.toolCalls, state: &state, task: userInput, cancel: cancel)
         }
-        return try await finish(state: state, reply: "（已达到最大步数 \(config.maxSteps)，未收口）")
+        return try await finish(state: state, reply: "（已达到最大步数 \(config.maxSteps)，未收口）", userInput: userInput)
     }
 
     /// 执行一组模型下发或预置的工具调用：逐个执行（可反思重试）并回填。
@@ -222,7 +229,7 @@ public final class AgentLoop {
     }
 
     /// 收口：观察口埋点、消息序列补最终回复、写会话事件、返回结局。
-    private func finish(state: TurnState, reply: String) async throws -> AgentTurn {
+    private func finish(state: TurnState, reply: String, userInput: String) async throws -> AgentTurn {
         config.onEvent?("agent.finished", [
             "replyLength": .int(Int64(reply.count)),
             "steps": .int(Int64(state.steps.count)),
@@ -232,6 +239,9 @@ public final class AgentLoop {
         try config.session?.append(SessionEventKind.assistantMessage, data: .object([
             "text": .string(reply),
         ]))
+        if let memory = config.memory, !reply.isEmpty {
+            try await memory.remember("用户：\(userInput)\n助手：\(reply)", tags: ["conversation"])
+        }
         return AgentTurn(reply: reply, steps: state.steps, messages: fullMessages, usage: state.usages)
     }
 
@@ -302,6 +312,8 @@ public final class AgentLoop {
         input.systemPrompt = config.systemPrompt
         input.compactor = config.compactor
         input.session = config.session
+        input.memory = config.memory
+        input.memoryLimit = config.memoryLimit
         return buildSystemText(input)
     }
 }

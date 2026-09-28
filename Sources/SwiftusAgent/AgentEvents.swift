@@ -171,6 +171,10 @@ public struct SystemTextInput {
     public var compactor: (any CompactionEngine)?
     /// 绑定会话。
     public var session: Session?
+    /// 长记忆库（提供相关记忆段）。
+    public var memory: MemoryStore?
+    /// 每轮召回的长期记忆条数。
+    public var memoryLimit = 5
 
     public init(userInput: String) {
         self.userInput = userInput
@@ -189,6 +193,13 @@ public func buildSystemText(_ input: SystemTextInput) -> String {
     let plan = planSection(input.session)
     if !plan.isEmpty {
         buffer += "\n\n\(plan)"
+    }
+    let memories = input.memory?.recall(input.userInput, limit: input.memoryLimit) ?? []
+    if !memories.isEmpty {
+        buffer += "\n\n[相关记忆]"
+        for entry in memories {
+            buffer += "\n- \(entry.text)"
+        }
     }
     return buffer
 }
