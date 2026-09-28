@@ -2,7 +2,7 @@ import SwiftusCore
 
 /// 大模型提供商抽象（规格 S10）。
 @ContextTreeActor
-public protocol LlmProvider: AnyObject {
+public protocol LlmProvider: AnyObject, Sendable {
     var name: String { get }
 
     /// 非流式聊天补全；实际实现可走流式端点累积（见 streamChatResult）。
