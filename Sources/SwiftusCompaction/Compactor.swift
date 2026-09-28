@@ -21,8 +21,10 @@ private struct CompactionTxn {
 ///
 /// 日志本身不被改写：被折叠的事件仍在日志里，压缩只是在末尾追加三个记录事件，
 /// 使「发给模型的这段摘要从哪来」可以从日志重建。
+/// 非 final 且 open：`summarizeFolded` 是分层压缩器（SwiftusAgent LayeredCompactor）的
+/// 覆盖点（对齐 Dart `LayeredCompactor extends Compactor`）。
 @ContextTreeActor
-public final class Compactor: CompactionEngine {
+open class Compactor: CompactionEngine {
     /// 保留为原始日志的最近事件数（实例预算）。
     public let keepRecent: Int
 
@@ -81,8 +83,9 @@ public final class Compactor: CompactionEngine {
         }
     }
 
-    /// 把待折叠的事件交给汇总器；分层压缩器覆盖入口的对应物（规格 S7 §3）。
-    func summarizeFolded(_ fold: CompactionFold, summarize: Summarizer) async throws -> CompactionSummary {
+    /// 把待折叠的事件交给汇总器；分层压缩器的覆盖点（规格 S7 §3，open 供
+    /// SwiftusAgent 的 LayeredCompactor 覆盖）。
+    open func summarizeFolded(_ fold: CompactionFold, summarize: Summarizer) async throws -> CompactionSummary {
         try await summarize(fold.events, fold.previous)
     }
 
