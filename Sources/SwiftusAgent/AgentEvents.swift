@@ -177,8 +177,7 @@ public struct SystemTextInput {
     }
 }
 
-/// 组装 system 文本（规格 S4 增补刀范围：prompt 段与动态上下文 + 历史摘要；
-/// 计划段与相关记忆随后续刀接入）。
+/// 组装 system 文本（prompt 段与动态上下文 + 历史摘要 + 当前计划段；相关记忆随后续刀接入）。
 @ContextTreeActor
 public func buildSystemText(_ input: SystemTextInput) -> String {
     var buffer = promptBlock(systemPrompt: input.systemPrompt, defaultSystemPrompt: input.defaultSystemPrompt)
@@ -186,6 +185,10 @@ public func buildSystemText(_ input: SystemTextInput) -> String {
        let summary = input.compactor?.summaryOf(session.id),
        !summary.isEmpty {
         buffer += "\n\n[历史摘要]\n\(summary)"
+    }
+    let plan = planSection(input.session)
+    if !plan.isEmpty {
+        buffer += "\n\n\(plan)"
     }
     return buffer
 }
