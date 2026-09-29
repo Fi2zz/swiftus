@@ -1,1 +1,98 @@
 # swiftus
+
+[conatus](https://github.com/Fi2zz/conatus)（Dart 实现的「时空可组合性」编程范式：可逆效应 + 反应式共效应）的 Swift 移植版。命名延续 cordis（TS）→ conatus（Dart）→ swiftus（Swift）的拉丁谱系——移植的动机是**摆脱 Dart 运行时单一依赖，让这套范式成为语言中立的资产**。
+
+- 语言 / 工具链：Swift 6（`swift-tools-version: 6.0`），在 **strict concurrency** 语境下开发
+- 平台下限：macOS 13 / iOS 16
+- 外部依赖：**Yams 5.x**（仅 `SwiftusSkill` 用它解析 frontmatter）+ 系统 `CryptoKit`（SigV4 签名）
+- 许可：MIT
+
+## 当前状态（2026-09-29）
+
+**W1 / W2 已收口**，W3 进行中。swift-testing **281 例 60 套件 debug + release 双绿**，release 构建零警告。
+
+| 波次 | 范围 | 状态 |
+|---|---|---|
+| W1 | core / credentials 最小集 / llm / prompt / tool / skill + 离线 Demo | ✅ |
+| W2 | Compaction / Schedule / session 持久化层 / Agent 全特性 / 任务中心 | ✅ |
+| W3 | 凭据全量 + SigV4（S12 v1.1 / S15）、Foundation 全部 14 个能力域（S18 fs+shell、S19 database/timer/time-context/logger/loader） | ✅ 进行中 |
+| W3 余下 | Cron（S9）/ Search / MCP（S11） | ⬜ 未开始 |
+
+离线 Demo 跑通「提问 → 工具调用 → 回填 → 收口」（脚本化模型，**无需任何 Key**）：
+
+```bash
+swift run swiftus-demo
+```
+
+## 模块地图
+
+依赖方向自上而下无环，镜像 conatus 的包结构（以 `Package.swift` 为准）：
+
+| target | 行数 | 依赖 | 职责 |
+|---|---|---|---|
+| `SwiftusCore` | 649 | —（只 `import Foundation`） | 上下文树 / 可逆效应（LIFO 撤销·幂等·迟到登记）/ Reactor / `ServiceKey` / `JSONValue` / `Redaction` |
+| `SwiftusFoundation` | 4,900 | Core | 14 个能力域：tools / session / session-log / system-prompt / memory / database / fs / shell / time-context / timer / logger / loader / ask-user / uuid |
+| `SwiftusCredentials` | 1,017 | Core | 五种来源（env / memory / file / vault / aws）+ AWS SigV4 签名链 |
+| `SwiftusLLM` | 925 | Core, Credentials | chat / responses 双形态、流式增量、fallback 链 |
+| `SwiftusCompaction` | 554 | Core, Foundation | 压缩切点（平衡切点）算法 |
+| `SwiftusSkill` | 1,335 | Core, Foundation, Yams | 技能 frontmatter 解析与目录发现 / 注册表 |
+| `SwiftusSchedule` | 1,961 | Core, Foundation | 调度选择器、IANA 时区 / DST 边界 |
+| `SwiftusAgent` | 6,294 | Core, Foundation, LLM, Compaction, Schedule | Agent Loop 全特性（规划 / 反思 / 路由 / 子智能体 / 审批 / 恢复 / 目标 / 遥测 / eval） |
+| `SwiftusTasks` | 1,105 | Core, Foundation, Agent, Schedule | 任务中心：状态机、工具、shell / schedule 交付追踪 |
+| `Swiftus` | 12 | 全部 | 伞产品：仅 `@_exported import` |
+| `SwiftusCron` / `SwiftusSearch` / `SwiftusMCP` | 0 | — | **已声明但尚无实现**（W3 待做） |
+
+### 取用建议
+
+**① 可以整片拿走用（零外部依赖）**——`SwiftusCore` 加 Foundation 的基础设施域（logger / timer / database / loader / fs / shell），约 3,000 行，只依赖系统框架与 Core：上下文树 + 可逆效应、分级日志、可逆定时器与节流防抖、KV 存储、有界输出的命令执行、带守卫的文件系统。`SwiftusCredentials` 亦可整拿（`CryptoKit` 是系统框架）。
+
+**② 有约束**：`shell` 与 `SessionPersistence` 用了 `Process` / `FileHandle`，**iOS 上编译不过**；`SwiftusSkill` 是唯一拉第三方包的地方。接入方 floor 低于 macOS 13 / iOS 16 需抬；模块级 global actor `@ContextTreeActor` 若被 vendored（拷源码而非依赖），两份 actor 身份不同、跨边界传值会别扭。
+
+**③ 建议整套搬**：`SwiftusAgent` / `SwiftusLLM` / `SwiftusCompaction` / `SwiftusSchedule` / `SwiftusTasks` 是建在上下文树与工具 / 装配管线之上的完整栈，抽单个文件得到的是演示而非能力。
+
+## 规格先行
+
+移植的四条铁律：**规格先行**（不逐行翻译 Dart，每个领域动工前先产出语言中立规格）、**共享 golden fixtures**（不逐条翻译 Dart 侧约 1600 个测试，而是导出行为级 fixtures 两端共用）、**Swift 惯用法 API**（形状允许偏离，语义不偏离）、**conatus 只读**（发现 Dart 侧缺陷只在 Swift 侧修正，并登记为规格的「有意偏离」条目）。
+
+`spec/` 下 **17 份**语言中立规格（编号 S1–S19，其中 S9 / S11 留给 W3）：
+
+| | | | |
+|---|---|---|---|
+| S1 效应语义 | S2 上下文树 | S3 session 事件格式 | S4 session-log |
+| S5 工具管线 | S6 prompt 装配 | S7 压缩切点 | S8 调度语义 |
+| S10 LLM 协议 | S12 凭据 | S13 memory 召回 | S14 skill catalog |
+| S15 SigV4 签名链 | S16 Agent Loop 产品化 | S17 任务中心 | S18 Foundation 能力域（fs / shell） |
+| S19 Foundation 能力域（database / timer / time-context / logger / loader） | | | |
+
+S9（Cron）与 S11（MCP）留给 W3。
+
+**规格这一层本身也可以复用**：它是语言中立的，两端跑同一批用例对答案——目标项目若要自己重写一套，这批规格与 fixtures 可以直接当验收基线，不必重译 Dart 测试。
+
+## Golden fixtures
+
+`spec/fixtures/` 下 **10 个领域、221 例**行为级用例，全部由本仓 `tool/export_fixtures/` 的 Dart 导出器在本地 conatus checkout 上**导出并校验**（不是手写）。归一化规则（时间不入 fixture、id 归一、事件循环时机不进断言等）见 `tool/export_fixtures/README.md`。
+
+```bash
+# 重新导出全部 fixtures（需同级目录有 conatus checkout，且已 dart pub get）
+bash tool/export_fixtures/export.sh
+```
+
+## 验证
+
+```bash
+swift build && swift test                          # debug
+swift build -c release && swift test -c release    # release（时序会变，必须双跑）
+swift run swiftus-demo                             # 离线端到端 Demo
+bash tool/export_fixtures/export.sh                # fixtures 重新导出
+```
+
+波次出口门槛：fixtures 全绿 + swift-testing 覆盖语义关键点 + `swift build -c release` 零警告。尚无 CI，落地前以本地 debug + release 双跑代替。
+
+## 文档
+
+- `AGENTS.md`——项目状态、仓库布局、执行顺序、测试策略、已定稿的设计决策、已知坑清单（面向 AI 编码代理与新成员）
+- `spec/S*.md`——各领域语言中立规格（含「有意偏离」条目与实现注记）
+- `HANDOFF.md`——跨会话交接：现状 / 已完成 / 下一步 / 验证命令 / 已采的坑（**本地文件，不在版本管理内**，见文件头说明）
+- `tool/export_fixtures/README.md`——fixtures 导出与归一化规则
+
+> ⚠️ `docs/.handoffs/` 下的两份权威文档（移植方案书 v1.2 / 可行性评估报告 v2.3）**目前不在工作区也不在版本管理内**——它们被全局 `~/.gitignore` 的 `.handoffs/` 规则命中，从未提交过，工作区副本已丢失且 git 无法恢复。文档里引用「方案书 §x」处暂时按 `AGENTS.md` + `spec/` 的「有意偏离」条目执行。
