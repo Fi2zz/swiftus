@@ -60,3 +60,11 @@ fastlane/report.xml
 fastlane/Preview.html
 fastlane/screenshots/**/*.png
 fastlane/test_output
+
+# 交接类文档：按约定只留本地，不入库
+#
+# docs/.handoffs/（方案书 / 评估报告等一次性交接材料）与 HANDOFF.md 是跨会话的
+# 工作材料，仓库只保留需要长期入库的 README.md / AGENTS.md / spec/。写在这里
+# 是为了让约定随仓库走，而不是依赖某台机器的全局 ~/.gitignore。
+docs/.handoffs/
+HANDOFF.md

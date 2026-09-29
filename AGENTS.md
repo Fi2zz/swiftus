@@ -58,12 +58,12 @@ Sources/
   SwiftusAgent/             # Agent Loop：plan / sub-agent / reflection / telemetry /
                             #   eval / approval / skill 沉淀 / recovery / autonomous schedule
   SwiftusTasks/             # 任务编排
-docs/.handoffs/             # ⚠️ 目录当前为空：下面两份权威文档（中文，移植的全部决策依据）
-                            #   因全局 ~/.gitignore 命中 .handoffs/ 与 handoff* 而未入库、
-                            #   工作区副本已丢失，git 无法恢复。需要它们时先找回：
+docs/.handoffs/             # 两份权威文档（中文，移植的全部决策依据）。
+                            # 按约定**只留本地、不入库**（.gitignore 已显式记录），
+                            # 故工作区里可能是空的；需要时从本机副本读取：
                             #   swiftus-移植方案书-v1.2.md      ← 主方案，自洽可读
                             #   conatus-Swift移植可行性评估报告-v2.3.md ← 工作量与决策依据
-                            # 在找回前，决策依据以本文件 + spec/S*.md 的「有意偏离」条目为准
+                            # 手上没有时，决策依据以本文件 + spec/S*.md 的「有意偏离」条目为准
 ```
 
 依赖方向（自上而下无环，镜像 conatus 包结构，`Package.swift` 为准）：

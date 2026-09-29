@@ -95,4 +95,4 @@ bash tool/export_fixtures/export.sh                # fixtures 重新导出
 - `HANDOFF.md`——跨会话交接：现状 / 已完成 / 下一步 / 验证命令 / 已采的坑（**本地文件，不在版本管理内**，见文件头说明）
 - `tool/export_fixtures/README.md`——fixtures 导出与归一化规则
 
-> ⚠️ `docs/.handoffs/` 下的两份权威文档（移植方案书 v1.2 / 可行性评估报告 v2.3）**目前不在工作区也不在版本管理内**——它们被全局 `~/.gitignore` 的 `.handoffs/` 规则命中，从未提交过，工作区副本已丢失且 git 无法恢复。文档里引用「方案书 §x」处暂时按 `AGENTS.md` + `spec/` 的「有意偏离」条目执行。
+> `docs/.handoffs/` 下的两份权威文档（移植方案书 v1.2 / 可行性评估报告 v2.3）与 `HANDOFF.md` **按约定只留本地、不入库**（`.gitignore` 已显式记录），因此工作区里可能找不到它们；文档中引用「方案书 §x」处，在本机没有该文件时按 `AGENTS.md` + `spec/` 的「有意偏离」条目执行。
