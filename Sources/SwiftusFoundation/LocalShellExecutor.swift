@@ -1,3 +1,4 @@
+#if os(macOS)
 import Foundation
 import SwiftusCore
 
@@ -396,3 +397,5 @@ final class OutputBuffer: @unchecked Sendable {
         lock.unlock()
     }
 }
+
+#endif

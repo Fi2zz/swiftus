@@ -206,5 +206,24 @@ public func provideShell(_ ctx: Context, executor: any ShellExecutor) throws -> 
 @ContextTreeActor
 @discardableResult
 public func provideShellLocal(_ ctx: Context, executor: (any ShellExecutor)? = nil) throws -> any ShellExecutor {
-    try provideShell(ctx, executor: executor ?? LocalShellExecutor())
+    #if os(macOS)
+    return try provideShell(ctx, executor: executor ?? LocalShellExecutor())
+    #else
+    // iOS 无子进程：端口仍可用，由调用方注入自己的执行器（见 S18 §7）。
+    guard let executor else {
+        throw ShellPortError.localBackendUnavailable
+    }
+    return try provideShell(ctx, executor: executor)
+    #endif
+}
+
+/// 平台不支持本地执行器时的错误（iOS：没有子进程概念）。
+public struct ShellPortError: Error, Equatable {
+    public let message: String
+    public init(message: String) { self.message = message }
+
+    /// 本地 shell 后端在当前平台不可用。
+    public static let localBackendUnavailable = ShellPortError(
+        message: "当前平台没有子进程，shell 端口需由调用方注入执行器。"
+    )
 }

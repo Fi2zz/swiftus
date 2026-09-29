@@ -3,7 +3,7 @@
 [conatus](https://github.com/Fi2zz/conatus)（Dart 实现的「时空可组合性」编程范式：可逆效应 + 反应式共效应）的 Swift 移植版。命名延续 cordis（TS）→ conatus（Dart）→ swiftus（Swift）的拉丁谱系——移植的动机是**摆脱 Dart 运行时单一依赖，让这套范式成为语言中立的资产**。
 
 - 语言 / 工具链：Swift 6（`swift-tools-version: 6.0`），在 **strict concurrency** 语境下开发
-- 平台下限：macOS 13 / iOS 16
+- 平台下限：macOS 13 / iOS 16——**iOS 侧已实测可编译**（`xcodebuild -destination 'generic/platform=iOS'`，9 个 target 全部通过）
 - 外部依赖：**Yams 5.x**（仅 `SwiftusSkill` 用它解析 frontmatter）+ 系统 `CryptoKit`（SigV4 签名）
 - 许可：MIT
 
@@ -46,7 +46,11 @@ swift run swiftus-demo
 
 **① 可以整片拿走用（零外部依赖）**——`SwiftusCore` 加 Foundation 的基础设施域（logger / timer / database / loader / fs / shell），约 3,000 行，只依赖系统框架与 Core：上下文树 + 可逆效应、分级日志、可逆定时器与节流防抖、KV 存储、有界输出的命令执行、带守卫的文件系统。`SwiftusCredentials` 亦可整拿（`CryptoKit` 是系统框架）。
 
-**② 有约束**：`shell` 与 `SessionPersistence` 用了 `Process` / `FileHandle`，**iOS 上编译不过**；`SwiftusSkill` 是唯一拉第三方包的地方。接入方 floor 低于 macOS 13 / iOS 16 需抬；模块级 global actor `@ContextTreeActor` 若被 vendored（拷源码而非依赖），两份 actor 身份不同、跨边界传值会别扭。
+**② 有约束**：
+- **iOS 只有一个功能缺口**——本地 shell 后端（`Process` 在 iOS SDK 不存在）整体置于 `#if os(macOS)`；**`ShellExecutor` / `ShellProcess` 端口本身跨平台可用**，iOS 由调用方注入自己的执行器即可。其余 9 个 target 在 iOS 上原样编译（fs / database / logger / timer / loader / time-context 六域无平台限制，`FileHandle` 也在 iOS 可用）；
+- `SwiftusSkill` 是唯一拉第三方包的地方（Yams）。接入方 floor 低于 macOS 13 / iOS 16 需抬；
+- 模块级 global actor `@ContextTreeActor`：若被 vendored（拷源码而非依赖），两份 actor 身份不同、跨边界传值会别扭；
+- **沙箱语义差异**：fs / database 走宿主磁盘，iOS 上受沙盒约束（Application Support 目录、不可访问任意路径），与 macOS 的行为面不同——这是平台本身的差异，不是实现问题。
 
 **③ 建议整套搬**：`SwiftusAgent` / `SwiftusLLM` / `SwiftusCompaction` / `SwiftusSchedule` / `SwiftusTasks` 是建在上下文树与工具 / 装配管线之上的完整栈，抽单个文件得到的是演示而非能力。
 

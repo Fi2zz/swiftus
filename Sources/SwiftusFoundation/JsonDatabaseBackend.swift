@@ -57,10 +57,18 @@ public final class JsonDatabaseBackend: DatabaseBackend {
         return dir + "/" + unit + ".json"
     }
 
-    /// 缺省目录 `<swiftus home>/database`。
+    /// 缺省目录：macOS 走 `<swiftus home>/database`；iOS 无 home 目录概念
+    /// （`homeDirectoryForCurrentUser` 在 iOS 不可用），改落沙盒内的
+    /// Application Support/database。
     static func defaultDir() -> String {
-        ((try? resolveSwiftusHome()) ?? FileManager.default.homeDirectoryForCurrentUser.path)
-            + "/database"
+        #if os(macOS)
+        let home = (try? resolveSwiftusHome()) ?? FileManager.default.homeDirectoryForCurrentUser.path
+        return home + "/database"
+        #else
+        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? URL(fileURLWithPath: NSTemporaryDirectory())
+        return base.appending(path: "database").path
+        #endif
     }
 }
 
