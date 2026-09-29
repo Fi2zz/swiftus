@@ -1,0 +1,168 @@
+{
+  "name": "search-markup",
+  "kind": "search-markup",
+  "cases": [
+    {
+      "scenario": "strip-markup",
+      "label": "去标签 + 解实体 + trim（snippet 会原样进模型可见输出）",
+      "input": [
+        {
+          "input": "<strong>粗体</strong> &amp; <em>斜体</em>",
+          "expect": "粗体 & 斜体"
+        },
+        {
+          "input": "&lt;tag&gt; &quot;q&quot; &#39;s&#39; &nbsp;x&nbsp;",
+          "expect": "<tag> \"q\" 's'  x"
+        },
+        {
+          "input": "  <a href=\"/x\">链接</a>  ",
+          "expect": "链接"
+        },
+        {
+          "input": "",
+          "expect": ""
+        },
+        {
+          "input": "没有标记的纯文本",
+          "expect": "没有标记的纯文本"
+        }
+      ],
+      "expect": [
+        {
+          "input": "<strong>粗体</strong> &amp; <em>斜体</em>",
+          "expect": "粗体 & 斜体"
+        },
+        {
+          "input": "&lt;tag&gt; &quot;q&quot; &#39;s&#39; &nbsp;x&nbsp;",
+          "expect": "<tag> \"q\" 's'  x"
+        },
+        {
+          "input": "  <a href=\"/x\">链接</a>  ",
+          "expect": "链接"
+        },
+        {
+          "input": "",
+          "expect": ""
+        },
+        {
+          "input": "没有标记的纯文本",
+          "expect": "没有标记的纯文本"
+        }
+      ]
+    },
+    {
+      "scenario": "strip-html",
+      "label": "去 script/style 块、标签换空格、解实体、压缩空白",
+      "input": [
+        {
+          "input": "<html><body><script>bad()</script><p>Hello &amp; world</p></body></html>",
+          "expect": "Hello & world"
+        },
+        {
+          "input": "<style>a{color:red}</style><p>正文</p>",
+          "expect": "正文"
+        },
+        {
+          "input": "<p>a</p><p>b</p>",
+          "expect": "a b"
+        },
+        {
+          "input": "<p>多  行\n\t文本</p>",
+          "expect": "多 行 文本"
+        },
+        {
+          "input": "",
+          "expect": ""
+        }
+      ],
+      "expect": [
+        {
+          "input": "<html><body><script>bad()</script><p>Hello &amp; world</p></body></html>",
+          "expect": "Hello & world"
+        },
+        {
+          "input": "<style>a{color:red}</style><p>正文</p>",
+          "expect": "正文"
+        },
+        {
+          "input": "<p>a</p><p>b</p>",
+          "expect": "a b"
+        },
+        {
+          "input": "<p>多  行\n\t文本</p>",
+          "expect": "多 行 文本"
+        },
+        {
+          "input": "",
+          "expect": ""
+        }
+      ]
+    },
+    {
+      "scenario": "duckduckgo-parse",
+      "label": "DuckDuckGo HTML 解析：uddg 跳转解码、按序配对、空项跳过、limit 截断",
+      "input": {
+        "cases": [
+          {
+            "html": "<div class=\"result\">\n  <a rel=\"nofollow\" class=\"result__a\"\n     href=\"//duckduckgo.com/l/?uddg=https%3A%2F%2Fexample.com%2Fa&amp;rut=x\">Example <b>A</b></a>\n  <a class=\"result__snippet\">First &amp; snippet</a>\n</div>\n<div class=\"result\">\n  <a rel=\"nofollow\" class=\"result__a\" href=\"https://example.org/b\">Example B</a>\n  <a class=\"result__snippet\">Second</a>\n</div>\n",
+            "limit": 5
+          },
+          {
+            "html": "<div class=\"result\">\n  <a rel=\"nofollow\" class=\"result__a\"\n     href=\"//duckduckgo.com/l/?uddg=https%3A%2F%2Fexample.com%2Fa&amp;rut=x\">Example <b>A</b></a>\n  <a class=\"result__snippet\">First &amp; snippet</a>\n</div>\n<div class=\"result\">\n  <a rel=\"nofollow\" class=\"result__a\" href=\"https://example.org/b\">Example B</a>\n  <a class=\"result__snippet\">Second</a>\n</div>\n",
+            "limit": 1
+          },
+          {
+            "html": "<a class=\"result__a\" href=\"https://example.com/ok\">OK</a>\n<a class=\"result__a\" href=\"\">无链接</a>\n<a class=\"result__a\" href=\"https://example.com/keep\">有标题</a>\n",
+            "limit": 5
+          },
+          {
+            "html": "<html></html>",
+            "limit": 5
+          }
+        ]
+      },
+      "expect": [
+        {
+          "results": [
+            {
+              "title": "Example A",
+              "url": "https://example.com/a",
+              "snippet": "First & snippet"
+            },
+            {
+              "title": "Example B",
+              "url": "https://example.org/b",
+              "snippet": "Second"
+            }
+          ]
+        },
+        {
+          "results": [
+            {
+              "title": "Example A",
+              "url": "https://example.com/a",
+              "snippet": "First & snippet"
+            }
+          ]
+        },
+        {
+          "results": [
+            {
+              "title": "OK",
+              "url": "https://example.com/ok",
+              "snippet": ""
+            },
+            {
+              "title": "有标题",
+              "url": "https://example.com/keep",
+              "snippet": ""
+            }
+          ]
+        },
+        {
+          "results": []
+        }
+      ]
+    }
+  ]
+}

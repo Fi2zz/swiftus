@@ -262,33 +262,35 @@ struct S19FixtureTests {
     private func runTimerCase(_ scenario: String) async throws -> [String: JSONValue] {
         switch scenario {
         case "timeout":
+            // 「等多久」一律有界轮询，不用固定 sleep：300+ 用例并发 + release 优化下
+            // 固定 200ms 会踩空（本项目在 release 全量跑时红过一次，firedOnce 落 0）。
             let ctx = Context.root(name: "timer/timeout")
-            var fired = 0
-            let off: Disposer = ctx.timeout({ fired += 1 }, after: .milliseconds(40))
-            try await Task.sleep(for: .milliseconds(200))
+            let fired = Counter()
+            let off: Disposer = ctx.timeout({ fired.bump() }, after: .milliseconds(40))
+            try await s19Eventually("timeout 触发") { fired.value >= 1 }
             try? off()
-            let afterTimeout = fired
+            let afterTimeout = fired.value
             let ctx2 = Context.root(name: "timer/timeout-cancel")
-            var cancelled = 0
-            let off2: Disposer = ctx2.timeout({ cancelled += 1 }, after: .milliseconds(40))
+            let cancelled = Counter()
+            let off2: Disposer = ctx2.timeout({ cancelled.bump() }, after: .milliseconds(40))
             try? off2()
             try await Task.sleep(for: .milliseconds(200))
             return [
                 "firedOnce": .int(Int64(afterTimeout)),
-                "firedAfterExplicitDisposer": .int(Int64(cancelled)),
+                "firedAfterExplicitDisposer": .int(Int64(cancelled.value)),
             ]
         case "interval":
             let ctx = Context.root(name: "timer/interval")
-            var ticks = 0
-            let off: Disposer = ctx.interval({ ticks += 1 }, every: .milliseconds(40))
-            try await Task.sleep(for: .milliseconds(260))
+            let ticks = Counter()
+            let off: Disposer = ctx.interval({ ticks.bump() }, every: .milliseconds(40))
+            try await s19Eventually("interval 触发多次") { ticks.value >= 2 }
             ctx.dispose()
-            let atDispose = ticks
+            let atDispose = ticks.value
             try await Task.sleep(for: .milliseconds(160))
             try? off()
             return [
                 "tickedMultipleTimes": .bool(atDispose >= 2),
-                "stoppedAfterDispose": .bool(ticks == atDispose),
+                "stoppedAfterDispose": .bool(ticks.value == atDispose),
             ]
         case "sleep":
             let ctx = Context.root(name: "timer/sleep")

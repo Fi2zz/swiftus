@@ -1,0 +1,226 @@
+{
+  "name": "search-registry",
+  "kind": "search-registry",
+  "cases": [
+    {
+      "scenario": "table",
+      "label": "内置源表：四个源、duckduckgo 免 Key、缺省顺序",
+      "input": {},
+      "expect": {
+        "names": [
+          "brave",
+          "duckduckgo",
+          "exa",
+          "tavily"
+        ],
+        "credentialKeys": {
+          "tavily": "TAVILY_API_KEY",
+          "exa": "EXA_API_KEY",
+          "brave": "BRAVE_API_KEY",
+          "duckduckgo": ""
+        },
+        "defaultOrder": [
+          "tavily",
+          "exa",
+          "brave",
+          "duckduckgo"
+        ]
+      }
+    },
+    {
+      "scenario": "build",
+      "label": "按 order 构造：缺 Key 跳过并记「缺少 <KEY>」、order 决定顺序、未知源记原因、免 Key 始终可用",
+      "input": {
+        "credentials": {
+          "missing": {
+            "TAVILY_API_KEY": "t"
+          },
+          "reordered": {
+            "EXA_API_KEY": "e",
+            "BRAVE_API_KEY": "b"
+          },
+          "empty": {}
+        },
+        "orders": {
+          "missing": [
+            "tavily",
+            "exa",
+            "brave",
+            "duckduckgo"
+          ],
+          "reordered": [
+            "duckduckgo",
+            "exa"
+          ],
+          "unknown": [
+            "nope",
+            "duckduckgo"
+          ],
+          "keyless": [
+            "duckduckgo"
+          ]
+        }
+      },
+      "expect": {
+        "missingProviders": [
+          "tavily",
+          "duckduckgo"
+        ],
+        "missingStatuses": [
+          {
+            "name": "tavily",
+            "available": true,
+            "reason": ""
+          },
+          {
+            "name": "exa",
+            "available": false,
+            "reason": "缺少 EXA_API_KEY"
+          },
+          {
+            "name": "brave",
+            "available": false,
+            "reason": "缺少 BRAVE_API_KEY"
+          },
+          {
+            "name": "duckduckgo",
+            "available": true,
+            "reason": ""
+          }
+        ],
+        "reorderedProviders": [
+          "duckduckgo",
+          "exa"
+        ],
+        "reorderedStatuses": [
+          {
+            "name": "duckduckgo",
+            "available": true,
+            "reason": ""
+          },
+          {
+            "name": "exa",
+            "available": true,
+            "reason": ""
+          }
+        ],
+        "unknownProviders": [
+          "duckduckgo"
+        ],
+        "unknownStatuses": [
+          {
+            "name": "nope",
+            "available": false,
+            "reason": "未知的搜索源"
+          },
+          {
+            "name": "duckduckgo",
+            "available": true,
+            "reason": ""
+          }
+        ],
+        "keylessProviders": [
+          "duckduckgo"
+        ],
+        "keylessStatuses": [
+          {
+            "name": "duckduckgo",
+            "available": true,
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "scenario": "assemble",
+      "label": "provideSearch：无凭据服务只装配 duckduckgo、显式/上下文凭据、显式 providers 忽略 order、上下文释放撤销注册",
+      "input": {
+        "order": [
+          "tavily",
+          "exa",
+          "brave",
+          "duckduckgo"
+        ],
+        "noCredentials": true,
+        "explicit": {
+          "EXA_API_KEY": "e"
+        },
+        "fromContext": {
+          "BRAVE_API_KEY": "b"
+        }
+      },
+      "expect": {
+        "noCredentials": {
+          "providers": [
+            "duckduckgo"
+          ],
+          "statuses": [
+            {
+              "name": "tavily",
+              "available": false,
+              "reason": "未提供凭据服务"
+            },
+            {
+              "name": "exa",
+              "available": false,
+              "reason": "未提供凭据服务"
+            },
+            {
+              "name": "brave",
+              "available": false,
+              "reason": "未提供凭据服务"
+            },
+            {
+              "name": "duckduckgo",
+              "available": true,
+              "reason": ""
+            }
+          ]
+        },
+        "afterDispose": {
+          "providers": 0
+        },
+        "explicit": {
+          "providers": [
+            "exa",
+            "duckduckgo"
+          ],
+          "statuses": [
+            {
+              "name": "tavily",
+              "available": false,
+              "reason": "缺少 TAVILY_API_KEY"
+            },
+            {
+              "name": "exa",
+              "available": true,
+              "reason": ""
+            },
+            {
+              "name": "brave",
+              "available": false,
+              "reason": "缺少 BRAVE_API_KEY"
+            },
+            {
+              "name": "duckduckgo",
+              "available": true,
+              "reason": ""
+            }
+          ]
+        },
+        "fromContext": {
+          "providers": [
+            "brave",
+            "duckduckgo"
+          ]
+        },
+        "explicitProviders": {
+          "providers": [
+            "x"
+          ],
+          "statuses": 0
+        }
+      }
+    }
+  ]
+}

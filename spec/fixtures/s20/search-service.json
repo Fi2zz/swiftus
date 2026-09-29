@@ -1,0 +1,131 @@
+{
+  "name": "search-service",
+  "kind": "search-service",
+  "cases": [
+    {
+      "scenario": "registry",
+      "label": "注册表：按注册顺序列出、get 未注册返回空、撤销幂等",
+      "input": {
+        "providers": [
+          {
+            "name": "a",
+            "fails": true,
+            "error": "boom"
+          },
+          {
+            "name": "b",
+            "results": [
+              {
+                "title": "T",
+                "url": "https://example.com",
+                "snippet": "S"
+              }
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "names": [
+          "a",
+          "b"
+        ],
+        "foundA": true,
+        "foundMissing": false,
+        "afterOff": [
+          "a",
+          "b"
+        ]
+      }
+    },
+    {
+      "scenario": "fallback",
+      "label": "顺序回退：首个不抛异常即返回（含空列表）、全部失败聚合文案、显式路由",
+      "input": {
+        "providers": [
+          {
+            "name": "a",
+            "fails": true,
+            "error": "boom"
+          },
+          {
+            "name": "b",
+            "results": [
+              {
+                "title": "T",
+                "url": "https://example.com",
+                "snippet": "S"
+              }
+            ]
+          }
+        ],
+        "emptyThenHit": [
+          {
+            "name": "a",
+            "results": []
+          },
+          {
+            "name": "b",
+            "results": [
+              {
+                "title": "T",
+                "url": "https://example.com",
+                "snippet": "S"
+              }
+            ]
+          }
+        ],
+        "allFail": [
+          {
+            "name": "a",
+            "fails": true,
+            "error": "boom"
+          },
+          {
+            "name": "b",
+            "fails": true,
+            "error": "HTTP 500"
+          }
+        ]
+      },
+      "expect": {
+        "firstSuccess": {
+          "results": [
+            {
+              "title": "T",
+              "url": "https://example.com",
+              "snippet": "S"
+            }
+          ]
+        },
+        "emptyIsSuccess": {
+          "results": []
+        },
+        "emptySkipsNext": [
+          "a",
+          "b"
+        ],
+        "allFailed": {
+          "error": "所有搜索 provider 都失败：a: SearchException: boom；b: SearchException: HTTP 500"
+        },
+        "explicitProvider": {
+          "results": [
+            {
+              "title": "T",
+              "url": "https://example.com",
+              "snippet": "S"
+            }
+          ]
+        },
+        "explicitFailing": {
+          "error": "所有搜索 provider 都失败：a: SearchException: boom"
+        },
+        "unregistered": {
+          "error": "未注册的搜索 provider \"z\""
+        },
+        "noProvider": {
+          "error": "没有可用的搜索 provider"
+        }
+      }
+    }
+  ]
+}

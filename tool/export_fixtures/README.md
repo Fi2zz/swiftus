@@ -70,6 +70,16 @@ S9（Cron）另有一组专用归一化：
 - **依赖本地时区的导出器必须钉死时区**：S9 的 `daily` 与小时级 cron 语义基于本地时区，导出器自检 `TZ=UTC`（`export.sh` 已带上），否则期望值随导出机器的时区漂移——本项目踩过一次：`daily 09:00` 在东八区落到 `01:00Z`、四年搜索还命中了错日。fixture 根里的 `localZone` 字段声明该域使用的时区，Swift 侧运行器按它注入；
 - **装载自检 + 空跑守卫**：每个 kind 一条「恰好命中一个 fixture 文件且用例非空」；每个运行器结尾再断言「至少比对过一次」——投影键被裁光、解析失败走 `continue` 都会让一条都没比，而参数化用例在这种情况下表现为全绿；
 
+S20（联网搜索与抓取）另有一组专用归一化：
+
+- **请求形状投影解码后的查询项**（不投原始 URL 串）：Dart 的 `Uri.queryParameters` 与 Swift 的 `URLComponents.queryItems` 在 `+` / `%20` 上不完全一致，逐字比 URL 会把用例绑死在编码细节上；方法 / 主机 / 路径 / 头名 / 体这些语义面才进 fixture；
+- **头名小写并剔掉传输层头**：Dart 的 `http.Headers` 大小写不敏感，URLSession 还会自动加 `content-length` / `accept-encoding`——头名列表要可比就得两边都归一（值的投影不受影响）；
+- **中文 fixture 必须显式声明 charset**：`http.Response.bytes` 不带 `content-type: …; charset=utf-8` 时按 latin1 解码，中文正文会变成乱码并被照抄进期望值；
+- **传输失败只投影消息前缀**（`errorPrefix`）：失败原因是语言相关的运行时描述（Dart 的 `ClientException` 文案 vs Foundation 的 `localizedDescription`），锁前缀即可；
+- **失败用例必须真的失败**：fetch_url 的「抓取失败」用例第一版与成功用例共用恒返回 200 的 client，期望值里落下的其实是正文——用例会「以失败的名字通过」；
+- **用到 URL 桩的 kind 必须走单条串行用例**：桩注册表是进程级单例而 swift-testing 并发跑用例；用 `NSLock` 串行会在协作线程池上死锁（持锁线程占满 → URLSession 回调拿不到线程 → 全部挂起），端点又必须与 fixture 逐字一致（没法换主机隔离），故只能把三个 kind 合进一条 `@Test` 顺序跑；
+- **桩按 host+port+path 分桶**（不只 authority）：S20 的 fixture 端点都挂在同一探测主机上。
+
 ## 同步纪律
 
 conatus 侧语义变更（对齐新 tag）时重新导出并提交；Swift 侧与 Dart 侧 fixtures 同步过测才算该变更完成。

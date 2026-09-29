@@ -1,0 +1,169 @@
+{
+  "name": "search-fetch",
+  "kind": "search-fetch",
+  "cases": [
+    {
+      "scenario": "http",
+      "label": "HttpFetcher：GET 去标签取正文、maxChars 截断、链接校验 / 非 200 / 传输失败归一",
+      "input": {
+        "page": "https://example.com/post",
+        "response": {
+          "status": 200,
+          "body": "<html><body><script>bad()</script><p>Hello &amp; world</p></body></html>"
+        },
+        "maxChars": 5,
+        "errors": {
+          "noHost": "not a url",
+          "noHostWithScheme": "https://",
+          "http404": {
+            "status": 404,
+            "body": ""
+          },
+          "network": {
+            "networkError": true
+          }
+        }
+      },
+      "expect": {
+        "ok": {
+          "page": {
+            "url": "https://example.com/post",
+            "content": "Hello & world",
+            "format": "text"
+          },
+          "shape": {
+            "sent": true,
+            "method": "GET",
+            "host": "example.com",
+            "path": "/post",
+            "query": {},
+            "headerNames": []
+          },
+          "truncated": "Hello"
+        },
+        "errors": {
+          "noHost": {
+            "error": "仅支持带主机名的 http/https 链接：\"not a url\""
+          },
+          "noHostWithScheme": {
+            "error": "仅支持带主机名的 http/https 链接：\"https://\""
+          },
+          "http404": {
+            "error": "HTTP 404"
+          },
+          "network": {
+            "errorPrefix": "抓取失败："
+          }
+        }
+      }
+    },
+    {
+      "scenario": "firecrawl",
+      "label": "FirecrawlFetcher：POST 形状取 markdown、六种失败形态各自文案",
+      "input": {
+        "page": "https://example.com/post",
+        "endpoint": "https://probe.test/scrape",
+        "apiKey": "f",
+        "response": {
+          "status": 200,
+          "body": "{\"success\":true,\"data\":{\"markdown\":\"# 标题\\n\\n正文\"}}"
+        },
+        "maxChars": 3,
+        "errors": {
+          "http500": {
+            "status": 500,
+            "body": ""
+          },
+          "notJson": {
+            "status": 200,
+            "body": "<html>502</html>"
+          },
+          "notObject": {
+            "status": 200,
+            "body": "[1,2]"
+          },
+          "successFalse": {
+            "status": 200,
+            "body": "{\"success\":false,\"error\":\"blocked\"}"
+          },
+          "successFalseNoError": {
+            "status": 200,
+            "body": "{\"success\":false}"
+          },
+          "noData": {
+            "status": 200,
+            "body": "{\"success\":true}"
+          },
+          "markdownMissing": {
+            "status": 200,
+            "body": "{\"success\":true,\"data\":{\"other\":1}}"
+          },
+          "markdownNotString": {
+            "status": 200,
+            "body": "{\"success\":true,\"data\":{\"markdown\":42}}"
+          },
+          "noHost": "ftp://x/y"
+        }
+      },
+      "expect": {
+        "ok": {
+          "page": {
+            "url": "https://example.com/post",
+            "content": "# 标题\n\n正文",
+            "format": "markdown"
+          },
+          "shape": {
+            "sent": true,
+            "method": "POST",
+            "host": "probe.test",
+            "path": "/scrape",
+            "query": {},
+            "headerNames": [
+              "authorization",
+              "content-type"
+            ],
+            "authHeader": "Bearer f",
+            "body": {
+              "url": "https://example.com/post",
+              "formats": [
+                "markdown"
+              ]
+            }
+          },
+          "truncated": "# 标"
+        },
+        "errors": {
+          "http500": {
+            "error": "Firecrawl HTTP 500"
+          },
+          "notJson": {
+            "error": "Firecrawl 返回了非 JSON 响应"
+          },
+          "notObject": {
+            "error": "Firecrawl 返回了非对象 JSON"
+          },
+          "successFalse": {
+            "error": "Firecrawl 抓取失败：blocked"
+          },
+          "successFalseNoError": {
+            "error": "Firecrawl 抓取失败：未知原因"
+          },
+          "noData": {
+            "error": "Firecrawl 响应缺少 data"
+          },
+          "markdownMissing": {
+            "content": ""
+          },
+          "markdownNotString": {
+            "error": "Firecrawl 返回了非字符串的 markdown"
+          },
+          "noHost": {
+            "error": "仅支持带主机名的 http/https 链接：\"ftp://x/y\""
+          },
+          "credentialKey": "FIRECRAWL_API_KEY"
+        },
+        "credentialKey": "FIRECRAWL_API_KEY"
+      }
+    }
+  ]
+}

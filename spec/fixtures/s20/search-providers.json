@@ -1,0 +1,214 @@
+{
+  "name": "search-providers",
+  "kind": "search-providers",
+  "cases": [
+    {
+      "scenario": "tavily",
+      "label": "tavily：POST + bearer + body 形状、results[].content、非 200 / 非对象 JSON",
+      "input": {
+        "endpoint": "https://probe.test/search",
+        "query": "swift 编程",
+        "limit": 99,
+        "apiKey": "k",
+        "responses": [
+          {
+            "status": 200,
+            "body": "{\"results\":[{\"title\":\"T1\",\"url\":\"https://example.com/1\",\"content\":\"正文 <b>一</b>\"}]}"
+          },
+          {
+            "status": 503,
+            "body": "nope"
+          },
+          {
+            "status": 200,
+            "body": "[1,2]"
+          }
+        ]
+      },
+      "expect": {
+        "name": "tavily",
+        "shape": {
+          "sent": true,
+          "method": "POST",
+          "host": "probe.test",
+          "path": "/search",
+          "query": {},
+          "headerNames": [
+            "authorization",
+            "content-type"
+          ],
+          "authHeader": "Bearer k",
+          "body": {
+            "query": "swift 编程",
+            "max_results": 20,
+            "search_depth": "basic"
+          }
+        },
+        "results": {
+          "results": [
+            {
+              "title": "T1",
+              "url": "https://example.com/1",
+              "snippet": "正文 <b>一</b>"
+            }
+          ]
+        },
+        "httpError": {
+          "error": "tavily HTTP 503"
+        },
+        "badJson": {
+          "error": "tavily 返回了非对象 JSON"
+        }
+      }
+    },
+    {
+      "scenario": "exa",
+      "label": "exa：POST + x-api-key + contents 形状、text 缺失回落 summary、缺字段降级空串",
+      "input": {
+        "endpoint": "https://probe.test/search",
+        "query": "q",
+        "limit": 3,
+        "apiKey": "k2",
+        "response": {
+          "status": 200,
+          "body": "{\"results\":[{\"title\":\"E1\",\"url\":\"https://example.com/e\",\"text\":\"长文本\"},{\"title\":\"E2\",\"url\":\"https://example.com/e2\",\"summary\":\"摘要\"},{\"url\":\"https://example.com/e3\"}]}"
+        }
+      },
+      "expect": {
+        "name": "exa",
+        "shape": {
+          "sent": true,
+          "method": "POST",
+          "host": "probe.test",
+          "path": "/search",
+          "query": {},
+          "headerNames": [
+            "content-type",
+            "x-api-key"
+          ],
+          "authHeader": "k2",
+          "body": {
+            "query": "q",
+            "numResults": 3,
+            "contents": {
+              "text": {
+                "maxCharacters": 500
+              }
+            }
+          }
+        },
+        "results": {
+          "results": [
+            {
+              "title": "E1",
+              "url": "https://example.com/e",
+              "snippet": "长文本"
+            },
+            {
+              "title": "E2",
+              "url": "https://example.com/e2",
+              "snippet": "摘要"
+            },
+            {
+              "title": "",
+              "url": "https://example.com/e3",
+              "snippet": ""
+            }
+          ]
+        }
+      }
+    },
+    {
+      "scenario": "brave",
+      "label": "brave：GET 查询项 + x-subscription-token、description 清洗、缺 web 键返回空",
+      "input": {
+        "endpoint": "https://probe.test/search",
+        "query": "swift 编程",
+        "limit": 99,
+        "apiKey": "k3",
+        "response": {
+          "status": 200,
+          "body": "{\"web\":{\"results\":[{\"title\":\"B1\",\"url\":\"https://example.com/b\",\"description\":\"摘要 <b>粗</b> &amp; more\"}]}}"
+        },
+        "noWebKeyResponse": {
+          "status": 200,
+          "body": "{\"other\":true}"
+        }
+      },
+      "expect": {
+        "name": "brave",
+        "shape": {
+          "sent": true,
+          "method": "GET",
+          "host": "probe.test",
+          "path": "/search",
+          "query": {
+            "q": "swift 编程",
+            "count": "20"
+          },
+          "headerNames": [
+            "accept",
+            "x-subscription-token"
+          ],
+          "authHeader": "k3"
+        },
+        "results": {
+          "results": [
+            {
+              "title": "B1",
+              "url": "https://example.com/b",
+              "snippet": "摘要 粗 & more"
+            }
+          ]
+        },
+        "noWebKey": {
+          "results": []
+        }
+      }
+    },
+    {
+      "scenario": "duckduckgo",
+      "label": "duckduckgo：GET + UA、html 解析、非 200",
+      "input": {
+        "endpoint": "https://probe.test/search",
+        "query": "q",
+        "response": {
+          "status": 200,
+          "body": "<a class=\"result__a\" href=\"https://example.com/d\">D <b>1</b></a><a class=\"result__snippet\">摘要 &amp; 一</a>"
+        },
+        "errorResponse": {
+          "status": 503,
+          "body": "nope"
+        }
+      },
+      "expect": {
+        "name": "duckduckgo",
+        "shape": {
+          "sent": true,
+          "method": "GET",
+          "host": "probe.test",
+          "path": "/search",
+          "query": {
+            "q": "q"
+          },
+          "headerNames": [
+            "user-agent"
+          ],
+          "hasUserAgent": true
+        },
+        "results": {
+          "results": [
+            {
+              "title": "D 1",
+              "url": "https://example.com/d",
+              "snippet": "摘要 & 一"
+            }
+          ]
+        },
+        "httpError": {
+          "error": "duckduckgo HTTP 503"
+        }
+      }
+    }
+  ]
+}
