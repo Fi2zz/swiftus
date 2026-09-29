@@ -108,7 +108,7 @@
 ## 7. 有意偏离
 
 - **Windows 分支不移植**（AGENTS 已定）：路径规范化的 `\` 切分与盘符判定仍按协议保留（跨平台输入同形），但实际执行与 `cmd /c` 不实现；`/dev/null` 等平台路径不入规格。
-- **本地 shell 后端只在 macOS 存在**：iOS 无子进程（`Process` 在 iOS SDK 不可用），故 `LocalShellExecutor` / `LocalShellProcess` 整体置于 `#if os(macOS)`；**`ShellExecutor` / `ShellProcess` 端口与全部词汇跨平台可用**，iOS 由调用方注入自己的执行器（`provideShellLocal` 在 iOS 上缺省执行器会抛 `ShellPortError.localBackendUnavailable`）。
+- **整个 shell 领域只在 macOS 存在**（2026-09-29 拍板）：iOS 无子进程（`Process` 在 iOS SDK 不可用），故 §4 的词汇、`ShellExecutor` / `ShellProcess` 端口、`shell` 服务键、`provideShell` / `provideShellLocal`、本地后端，以及 S17 的 `TrackingTaskShellExecutor` **一并收进 `#if os(macOS)`**。取舍：**不给「以后也许能注入执行器」的空承诺**——iOS 表面不暴露 shell，将来 iOS 真要跑命令（WKWebView JS 沙箱 / 端侧执行服务）时按本规格新增实现即可，协议本身已经写全。
 - **JSON 后端缺省目录分平台**：macOS 走 `<swiftus home>/database`；iOS 无 home 目录概念（`homeDirectoryForCurrentUser` 不可用），改落沙盒内 Application Support/database。fs / database / logger / timer / loader / time-context 六域**无平台限制**，iOS 与 macOS 同码。
 - **被信号杀死时的退出码**：Dart 的文档注释写「为 null」而实现给的是**负数**（`-9` = SIGKILL）；Foundation 的 `Process.terminationStatus` 给的是**信号号**（SIGKILL → `9`，配 `terminationReason == .uncaughtSignal`）。符号是运行时细节，协议只锁定「非 0」，fixtures 只断言非 0。硬杀统一用 SIGKILL（与 Dart 的 `Process.kill(ProcessSignal.sigkill)` 同款；`Process.terminate()` 发的是 SIGTERM，给被测进程留了自行退出的机会）。
 - **shell 输出不做 spill 落盘**：`spillPath` 是「截断且能提供」的可选字段，本地实现**不提供**（结构保留、恒为空）——落盘策略留给上层策略插件。
@@ -125,5 +125,5 @@
 - 严格 UTF-8 解码用 `String(data:encoding:.utf8)`（失败即 nil → `notText`）；shell 输出用**宽松解码**（`allowMalformed` 等价）以免半截字节让整段输出消失；
 - shell 的超时与取消经 `ShellWaiter` 缝注入（生产 `Task.sleep`，测试受控），与 S12 `RefreshClock` 同款纪律；
 - 后台进程句柄是 `final class`（缓冲 + 游标 + 一次性落定的状态机），`wait()` 语义对应 Dart 的 `done`，`readOutput()` 消费式增量；
-- **iOS 可编译（2026-09-29 实测）**：`xcodebuild -destination 'generic/platform=iOS'` 逐 target 验证 9 个 target 全部 BUILD SUCCEEDED；改动仅上述两处平台分支，macOS 侧测试与 Demo 行为不变（281 例双绿）；
+- **iOS 可编译（2026-09-29 实测）**：`xcodebuild -destination 'generic/platform=iOS'` 逐 target 验证 Core / Foundation / Credentials / LLM / Compaction / Schedule / Skill / Agent / Tasks 与伞产品 Swiftus 共 10 个 scheme 全部 BUILD SUCCEEDED；符号表核对 iOS 产物里 shell 相关符号数为 0（macOS 为 235），确认「域真的不在」而非「编得过」；macOS 侧 281 例 debug+release 双绿、Demo 不变；
 - **S17 §7 的 shell 端口偏离在此收口**：`TrackingTaskShellExecutor` 改为包裹本规格的 `ShellExecutor`，任务域内的替身端口（`TaskShellExecutor` / `TaskShellSpec` / `TaskShellRunResult` / `TaskShellProcess`）删除，fixture 与单元测试同步改用本地后端。

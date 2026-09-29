@@ -96,6 +96,8 @@ public final class TaskTracking: AgentTurnTracker {
     }
 }
 
+// shell 追踪装饰器随 shell 领域一起只在 macOS 存在（iOS 无子进程，见 S18 §7）。
+#if os(macOS)
 // ══════════════════════════════════════════════════════════════
 // shell 执行追踪（规格 S17 §5.4；执行端口见 S18 §4）
 // ══════════════════════════════════════════════════════════════
@@ -175,6 +177,8 @@ public final class TrackingTaskShellExecutor: ShellExecutor {
         )
     }
 }
+
+#endif
 
 // ══════════════════════════════════════════════════════════════
 // schedule 交付追踪（规格 S17 §5.3）

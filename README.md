@@ -47,7 +47,7 @@ swift run swiftus-demo
 **① 可以整片拿走用（零外部依赖）**——`SwiftusCore` 加 Foundation 的基础设施域（logger / timer / database / loader / fs / shell），约 3,000 行，只依赖系统框架与 Core：上下文树 + 可逆效应、分级日志、可逆定时器与节流防抖、KV 存储、有界输出的命令执行、带守卫的文件系统。`SwiftusCredentials` 亦可整拿（`CryptoKit` 是系统框架）。
 
 **② 有约束**：
-- **iOS 只有一个功能缺口**——本地 shell 后端（`Process` 在 iOS SDK 不存在）整体置于 `#if os(macOS)`；**`ShellExecutor` / `ShellProcess` 端口本身跨平台可用**，iOS 由调用方注入自己的执行器即可。其余 9 个 target 在 iOS 上原样编译（fs / database / logger / timer / loader / time-context 六域无平台限制，`FileHandle` 也在 iOS 可用）；
+- **iOS 上没有 shell**——iOS 无子进程（`Process` 在 iOS SDK 不存在），故整个 shell 领域（词汇、`ShellExecutor` 端口、`shell` 服务键、装配、本地后端，以及 S17 的 shell 追踪装饰器）收在 `#if os(macOS)` 内，**iOS 表面不暴露 shell**。其余 9 个 target 在 iOS 上原样编译：fs / database / logger / timer / loader / time-context 六域无平台限制（`FileHandle` 在 iOS 可用），Agent / Tasks / LLM / Schedule / Compaction / Skill / Credentials 亦然；
 - `SwiftusSkill` 是唯一拉第三方包的地方（Yams）。接入方 floor 低于 macOS 13 / iOS 16 需抬；
 - 模块级 global actor `@ContextTreeActor`：若被 vendored（拷源码而非依赖），两份 actor 身份不同、跨边界传值会别扭；
 - **沙箱语义差异**：fs / database 走宿主磁盘，iOS 上受沙盒约束（Application Support 目录、不可访问任意路径），与 macOS 的行为面不同——这是平台本身的差异，不是实现问题。

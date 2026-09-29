@@ -6,7 +6,7 @@
 
 **swiftus** 是 [conatus](https://github.com/Fi2zz/conatus)（Dart 实现的「时空可组合性」编程范式框架：可逆效应 + 反应式共效应）的 Swift 移植版，命名延续 cordis（TS）→ conatus（Dart）→ swiftus（Swift）的拉丁谱系。移植动机是摆脱 Dart 运行时单一依赖，使框架成为语言中立的资产。
 
-**当前状态（2026-09-29）**：**W2 已收口**——W1 的 core / credentials 最小集 / llm / prompt / tool / skill 之上，Compaction / Schedule / session 持久化层 / Agent 全特性 / 任务中心全部就位，离线 Demo `swift run swiftus-demo` 跑通「提问 → 工具调用 → 回填 → 收口」（脚本化模型，无需 Key），swift-testing 281 例 60 套件 debug+release 双绿、release 零警告。外部依赖：Yams（仅 SwiftusSkill）+ 系统 CryptoKit（SigV4）。平台 floor macOS 13 / iOS 16（§5.6 抬升；iOS 侧 2026-09-29 已逐 target 实测可编译，唯一功能缺口是本地 shell 后端走 `#if os(macOS)`，端口跨平台）。没有 CI。W3 进行中：凭据全量 + SigV4（S12 v1.1 / S15）与 Foundation 全部 14 个能力域（S18 fs+shell、S19 database/timer/time-context/logger/loader）已收口，余下 Cron(S9) → Search → MCP(S11)。
+**当前状态（2026-09-29）**：**W2 已收口**——W1 的 core / credentials 最小集 / llm / prompt / tool / skill 之上，Compaction / Schedule / session 持久化层 / Agent 全特性 / 任务中心全部就位，离线 Demo `swift run swiftus-demo` 跑通「提问 → 工具调用 → 回填 → 收口」（脚本化模型，无需 Key），swift-testing 281 例 60 套件 debug+release 双绿、release 零警告。外部依赖：Yams（仅 SwiftusSkill）+ 系统 CryptoKit（SigV4）。平台 floor macOS 13 / iOS 16（§5.6 抬升；iOS 侧 2026-09-29 已逐 target 实测可编译：**shell 领域整体只在 macOS 存在**，iOS 表面不暴露）。没有 CI。W3 进行中：凭据全量 + SigV4（S12 v1.1 / S15）与 Foundation 全部 14 个能力域（S18 fs+shell、S19 database/timer/time-context/logger/loader）已收口，余下 Cron(S9) → Search → MCP(S11)。
 
 移植范围（已拍板）：
 
