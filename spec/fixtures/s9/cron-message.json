@@ -1,0 +1,60 @@
+{
+  "name": "cron-message",
+  "kind": "cron-message",
+  "now": "2026-03-09T10:00:00.000Z",
+  "startedAt": "2026-03-09T08:00:00.000Z",
+  "cases": [
+    {
+      "scenario": "view",
+      "label": "模型可见视图：schedule 四选一、daily 已消费顺延一天、at 已消费无下次",
+      "expect": {
+        "daily": {
+          "id": "t-daily",
+          "prompt": "做点什么",
+          "schedule": {
+            "daily": "07:00"
+          },
+          "enabled": true,
+          "origin": "dynamic",
+          "sessionId": "s9",
+          "lastRunAt": "2026-03-08T07:00:00.000Z",
+          "firedAt": null,
+          "nextRunAt": "2026-03-08T23:00:00.000Z"
+        },
+        "firedAt": {
+          "id": "t-at",
+          "prompt": "做点什么",
+          "schedule": {
+            "at": "2026-03-09T09:00:00Z"
+          },
+          "enabled": true,
+          "origin": "dynamic",
+          "sessionId": null,
+          "lastRunAt": null,
+          "firedAt": "2026-03-09T09:00:00.000Z",
+          "nextRunAt": null
+        },
+        "cron": {
+          "id": "t-cron",
+          "prompt": "做点什么",
+          "schedule": {
+            "cron": "*/15 * * * *"
+          },
+          "enabled": true,
+          "origin": "dynamic",
+          "sessionId": null,
+          "lastRunAt": null,
+          "firedAt": null,
+          "nextRunAt": "2026-03-09T08:00:00.000Z"
+        }
+      }
+    },
+    {
+      "scenario": "framing",
+      "label": "触发 framing 逐行固定（防注入设计，不许改写）",
+      "expect": {
+        "framing": "[cron] Scheduled task \"t-1\" fired.\nScheduled for: 2026-03-09T09:00:00.000Z\nFired at: 2026-03-09T09:00:01.000Z\n\nThis is an automated task submitted by the cron plugin, not a message from the user.\nExecute the task inside <task> now, then report the result concisely.\n\n<task>\n把昨天的会议纪要发出去\n</task>"
+      }
+    }
+  ]
+}

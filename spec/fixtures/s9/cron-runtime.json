@@ -1,0 +1,38 @@
+{
+  "name": "cron-runtime",
+  "kind": "cron-runtime",
+  "now": "2026-03-09T10:00:00.000Z",
+  "cases": [
+    {
+      "scenario": "delivery",
+      "label": "投递：返回假不消费时段且下 tick 重试、抛错不消费、交付成功才写运行戳与历史",
+      "expect": {
+        "afterRefuse": {
+          "lastRunAt": null,
+          "historyCount": 0,
+          "warned": 0
+        },
+        "afterAccept": {
+          "lastRunAt": null,
+          "historyCount": 0,
+          "deliveredCount": 0
+        },
+        "afterThrow": {
+          "lastRunAt": null,
+          "historyCount": 0
+        },
+        "isolated": {
+          "goodDelivered": 0
+        }
+      }
+    },
+    {
+      "scenario": "run-now",
+      "label": "runTaskNow：任务不存在 → not-found；投递不可用 → delivery-unavailable",
+      "expect": {
+        "missing": "not-found",
+        "unavailable": "delivery-unavailable"
+      }
+    }
+  ]
+}

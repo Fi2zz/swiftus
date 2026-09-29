@@ -1,0 +1,135 @@
+{
+  "name": "cron-registry",
+  "kind": "cron-registry",
+  "now": "2026-03-09T10:00:00.000Z",
+  "cases": [
+    {
+      "scenario": "boot",
+      "label": "装配：持久动态任务 → 配置任务 → 运行戳 → 启停覆盖；非法与重 id 跳过并告警",
+      "expect": {
+        "ids": [
+          "kept",
+          "dup",
+          "cfg"
+        ],
+        "warnings": 2,
+        "keptLastRunAt": "2026-03-09T09:00:00.000Z",
+        "cfgOverride": false,
+        "keptOrigin": "dynamic",
+        "cfgOrigin": "config"
+      }
+    },
+    {
+      "scenario": "crud",
+      "label": "动态任务增删改：重 id / 非法输入被拒，改排期重置运行戳，覆盖与声明一致时归空",
+      "expect": {
+        "added": {
+          "id": "dyn-1",
+          "prompt": "原提示",
+          "schedule": {
+            "everySeconds": 30
+          },
+          "enabled": true,
+          "origin": "dynamic",
+          "sessionId": "s1",
+          "lastRunAt": null,
+          "firedAt": null,
+          "nextRunAt": "2026-03-09T10:00:30.000Z"
+        },
+        "duplicate": {
+          "error": "duplicate-id"
+        },
+        "invalid": {
+          "error": "invalid-task"
+        },
+        "editPromptOnly": {
+          "id": "dyn-1",
+          "prompt": "新提示",
+          "schedule": {
+            "everySeconds": 30
+          },
+          "enabled": true,
+          "origin": "dynamic",
+          "sessionId": "s1",
+          "lastRunAt": null,
+          "firedAt": null,
+          "nextRunAt": "2026-03-09T10:00:30.000Z"
+        },
+        "editSchedule": {
+          "id": "dyn-1",
+          "prompt": "新提示",
+          "schedule": {
+            "daily": "07:15"
+          },
+          "enabled": true,
+          "origin": "dynamic",
+          "sessionId": "s1",
+          "lastRunAt": null,
+          "firedAt": null,
+          "nextRunAt": "2026-03-08T23:15:00.000Z"
+        },
+        "editConfigTask": {
+          "error": "not-found"
+        },
+        "removeConfigTask": {
+          "error": "not-found"
+        },
+        "removeMissing": {
+          "error": "not-found"
+        },
+        "disabled": {
+          "id": "dyn-1",
+          "prompt": "新提示",
+          "schedule": {
+            "daily": "07:15"
+          },
+          "enabled": false,
+          "origin": "dynamic",
+          "sessionId": "s1",
+          "lastRunAt": null,
+          "firedAt": null,
+          "nextRunAt": null
+        },
+        "reEnabled": {
+          "id": "dyn-1",
+          "prompt": "新提示",
+          "schedule": {
+            "daily": "07:15"
+          },
+          "enabled": true,
+          "origin": "dynamic",
+          "sessionId": "s1",
+          "lastRunAt": null,
+          "firedAt": null,
+          "nextRunAt": "2026-03-08T23:15:00.000Z"
+        },
+        "generated": {
+          "shape": true,
+          "boundSession": null,
+          "viewSchedule": {
+            "everySeconds": 60
+          }
+        },
+        "remainingIds": [
+          "task-mmj0fgg0-amee"
+        ]
+      }
+    },
+    {
+      "scenario": "persistence",
+      "label": "持久化只写显式字段表：内部缓存不落盘，删任务后表里不再有它",
+      "expect": {
+        "savedTaskKeys": [
+          [
+            "enabled",
+            "every",
+            "id",
+            "prompt",
+            "sessionId"
+          ]
+        ],
+        "savedCount": 1
+      }
+    }
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "name": "cron-history",
+  "kind": "cron-history",
+  "now": "2026-03-09T10:00:00.000Z",
+  "cases": [
+    {
+      "scenario": "ledger",
+      "label": "账本：seq 预分配与归还保持连续、记录序列化、finish 推进与摘要截断、未知 id 返回空",
+      "expect": {
+        "firstSeqReleased": 0,
+        "secondSeq": 0,
+        "recordIdShape": true,
+        "record": {
+          "id": "run-0-mmj0fgg0",
+          "seq": 0,
+          "taskId": "t1",
+          "prompt": "",
+          "sessionId": null,
+          "scheduledFor": "2026-03-09T10:00:00.000Z",
+          "firedAt": "2026-03-09T10:00:00.000Z",
+          "status": "failed",
+          "excerpt": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "completedAt": "2026-03-09T10:00:00.000Z"
+        },
+        "finishedStatus": "failed",
+        "excerptLength": 300,
+        "failedStatusOnMissing": "failed",
+        "missingRecord": "null"
+      }
+    },
+    {
+      "scenario": "limit",
+      "label": "list 的 limit 退化：缺省与非法 → 100，超过上限 → 500",
+      "expect": {
+        "caps": [
+          1,
+          1,
+          1,
+          1,
+          1
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,112 @@
+{
+  "name": "cron-rules",
+  "kind": "cron-rules",
+  "now": "2026-03-09T10:00:00.000Z",
+  "startedAt": "2026-03-09T08:00:00.000Z",
+  "cases": [
+    {
+      "scenario": "validate",
+      "label": "输入校验：id 形状、prompt、四选一、规则取值与消息逐字",
+      "expect": {
+        "messages": [
+          null,
+          null,
+          "task \"a\" every must be a number >= 10",
+          null,
+          "task \"a\" has an unparseable at value",
+          null,
+          "task \"a\" daily must be \"HH:MM\" (24h)",
+          "task \"a\" daily must be \"HH:MM\" (24h)",
+          null,
+          "task \"a\" has an invalid cron expression (want 5 fields: minute hour day month weekday)",
+          null,
+          "invalid task id: \"\"",
+          "task \"a\" needs a non-empty prompt",
+          "task \"a\" must set exactly one of at / every / daily / cron",
+          "task \"a\" must set exactly one of at / every / daily / cron",
+          "task \"a\" every must be a number >= 10",
+          "task \"a\" must set exactly one of at / every / daily / cron"
+        ]
+      }
+    },
+    {
+      "scenario": "due",
+      "label": "到期判定与下次触发：at 已消费、every 锚点、daily 补发与已消费、cron 缓存、停用",
+      "expect": [
+        {
+          "label": "at：未到点",
+          "due": null,
+          "nextRunAt": "2026-03-09T11:00:00.000Z"
+        },
+        {
+          "label": "at：到点即触发",
+          "due": "2026-03-09T09:00:00.000Z",
+          "nextRunAt": "2026-03-09T09:00:00.000Z"
+        },
+        {
+          "label": "at：已消费不再触发",
+          "due": null,
+          "nextRunAt": null
+        },
+        {
+          "label": "every：未到间隔",
+          "due": null,
+          "nextRunAt": "2026-03-09T10:05:00.000Z"
+        },
+        {
+          "label": "every：到间隔",
+          "due": "2026-03-09T10:00:00.000Z",
+          "nextRunAt": "2026-03-09T10:00:00.000Z"
+        },
+        {
+          "label": "every：从未运行，以装配时刻为锚",
+          "due": "2026-03-09T09:00:00.000Z",
+          "nextRunAt": "2026-03-09T09:00:00.000Z"
+        },
+        {
+          "label": "every：允许小数间隔",
+          "due": null,
+          "nextRunAt": "2026-03-09T10:00:06.500Z"
+        },
+        {
+          "label": "daily：今天这格未到",
+          "due": "2026-03-09T03:00:00.000Z",
+          "nextRunAt": "2026-03-09T03:00:00.000Z"
+        },
+        {
+          "label": "daily：今天这格已过且未运行 → 补发",
+          "due": "2026-03-09T01:00:00.000Z",
+          "nextRunAt": "2026-03-09T01:00:00.000Z"
+        },
+        {
+          "label": "daily：今天这格已消费 → 不再补发",
+          "due": null,
+          "nextRunAt": "2026-03-10T01:00:00.000Z"
+        },
+        {
+          "label": "cron：未到下一分钟",
+          "due": "2026-03-09T08:00:00.000Z",
+          "nextRunAt": "2026-03-09T08:00:00.000Z"
+        },
+        {
+          "label": "cron：下一分钟已到",
+          "due": "2026-03-09T10:00:00.000Z",
+          "nextRunAt": "2026-03-09T10:00:00.000Z"
+        },
+        {
+          "label": "停用覆盖为假 → 不触发且无下次",
+          "due": null,
+          "nextRunAt": null
+        }
+      ]
+    },
+    {
+      "scenario": "id-gen",
+      "label": "生成 id 的形状与唯一性（值不入 fixture）",
+      "expect": {
+        "shapeMatches": true,
+        "distinctWithSameInstant": true
+      }
+    }
+  ]
+}
