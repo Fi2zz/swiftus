@@ -94,6 +94,7 @@ bash tool/export_fixtures/export.sh                # fixtures 重新导出
 
 ## 文档
 
+- `docs/ios-接入指南.md`——**iOS 接入**：加依赖方式、选哪个 product、可编译样例、四个必踩的坑（`Task` 遮蔽 / `@ContextTreeActor` 隔离 / 凭据别硬编码 / iOS 无 shell）、平台能力对照、样例自检命令
 - `AGENTS.md`——项目状态、仓库布局、执行顺序、测试策略、已定稿的设计决策、已知坑清单（面向 AI 编码代理与新成员）
 - `spec/S*.md`——各领域语言中立规格（含「有意偏离」条目与实现注记）
 - `HANDOFF.md`——跨会话交接：现状 / 已完成 / 下一步 / 验证命令 / 已采的坑（**本地文件，不在版本管理内**，见文件头说明）
