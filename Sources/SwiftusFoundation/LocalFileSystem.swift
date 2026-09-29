@@ -302,17 +302,27 @@ public final class LocalFileSystem: FileSystem {
         }
     }
 
-    /// 原子发布：父目录递归创建 → 临时文件 → rename；rename 失败退化为直接写。
-    static func writeAtomic(path: String, content: String) throws {
+    /// 原子发布：父目录递归创建 → 临时文件 → 替换目标。
+    ///
+    /// 三级降级（**`moveItem` 在目标已存在时会失败**，只写一次的文件看起来正常、
+    /// 第二次以后全丢——本项目在 cron 存储上踩过一次）：
+    /// 1. 目标已存在 → `replaceItemAt`（原子替换）；
+    /// 2. 目标不存在 → `moveItem`（rename）；
+    /// 3. 都不行 → 直接覆盖 + 清理临时文件（最后手段，非原子）。
+    public static func writeAtomic(path: String, content: String) throws {
         let manager = FileManager.default
         try manager.createDirectory(atPath: dirName(path), withIntermediateDirectories: true)
         let temp = "\(path).tmp-\(Int(Date().timeIntervalSince1970 * 1_000_000))"
-        try Data(content.utf8).write(to: URL(fileURLWithPath: temp))
+        let data = Data(content.utf8)
+        try data.write(to: URL(fileURLWithPath: temp))
+        let destination = URL(fileURLWithPath: path)
+        if manager.fileExists(atPath: path), (try? manager.replaceItemAt(destination, withItemAt: URL(fileURLWithPath: temp))) != nil {
+            return
+        }
         do {
             try manager.moveItem(atPath: temp, toPath: path)
         } catch {
-            // 目标已存在时 moveItem 会失败：退化为直接覆盖并清理临时文件。
-            try Data(content.utf8).write(to: URL(fileURLWithPath: path))
+            try data.write(to: destination)
             try? manager.removeItem(atPath: temp)
         }
     }

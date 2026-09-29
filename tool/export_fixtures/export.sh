@@ -12,5 +12,6 @@ if [[ ! -f "$CONFIG" ]]; then
 fi
 cd "$ROOT"
 for script in "$ROOT"/tool/export_fixtures/export_*.dart; do
-  dart --packages="$CONFIG" "$script"
+  # S9 的 cron 规则基于本地时区，导出器自检 TZ=UTC（其余导出器不受影响）
+  TZ=UTC dart --packages="$CONFIG" "$script"
 done

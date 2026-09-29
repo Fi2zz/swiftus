@@ -96,7 +96,7 @@
 
 ## 9. 存储端口
 
-- `CronStorage`（与 FileSystem / ShellExecutor 同构的**能力缝**）：`loadTasks() -> 快照`（动态任务原文 + 运行戳 + 启停覆盖）、`saveTasks(...)`、`loadHistory()` / `appendHistory(...)`（或整体重写）、`close()`；
+- `CronStorage`（与 FileSystem / ShellExecutor 同构的**能力缝**）：`loadTasks() -> 快照`（动态任务原文 + 运行戳 + 启停覆盖）、`saveTasks(...)`、`loadHistory()` / `saveHistory(...)`（整体重写）；
 - 读取约定**宽容降级**：缺失视为空、损坏告警后视为空；**写入失败不得抛出**（调度不该因存储故障中断）；
 - 本地实现：任务表与历史各一个 JSON/JSONL 文件，历史**惰性加载**、追加后整体封顶并原子重写。
 
@@ -116,6 +116,8 @@
 ## 11. 有意偏离
 
 - **`CronStorage` 的历史写入形状**：Dart 侧历史按「追加一行」暴露，本移植改为「整体重写」（与 §7 的封顶原子重写一致），端口语义不变；
+- **无时区信息的 `at` 串按 UTC 解释**：来源的 `DateTime.tryParse` 把 `2026-03-09T09:00:00` 这类无偏移串当作**进程本地时区**；本移植固定按 UTC 解释——规则函数是纯函数、不持有环境时区，按机器时区解释会让同一份配置在不同机器上触发时刻不同。需要特定时区的宿主应自己带上偏移；
+- **预分配记录标识前先加载账本**：来源的 `allocateRef` 不触发账本加载，`seq` 仍是从 0 起的初值，于是「重启后第一次交付」会复用磁盘上已有记录的 seq 与记录 id。本移植在 `allocateRef` 里先加载（seq 从磁盘最大值续接），避免撞号；
 - **系统通知端口**：Dart 侧 `CronNotifier` 已有抽象但无平台实现，本移植只保留端口与文案，不实现具体通知（macOS `UNUserNotificationCenter` / iOS 无此框架，均不实现）；
 - **随机 id 后缀**：Dart 用 `dart:math` 随机数，本移植用注入的 `(Int) -> Int` 熵源（测试可确定），形状与唯一性保证不变；
 - **本规格不覆盖事件流的 `running` 状态推进**：dsh-cron 事件流语义保留但本端口不主动置位（与 Dart 一致）。
@@ -127,6 +129,12 @@
 - **cron 表达式引擎是纯函数**，可直接用「已知表达式 → 已知触发时刻」的对拍表验证（Dart 侧 `cron_parse_test.dart` 有同款断言，导出成 fixtures）；
 - 内部缓存（解析结果 / 下一分钟）用 `class` 内的可变字段承载（`CronTask` 是类不是 struct，否则每次改都要回写表）；
 - **「今日这一格已消费」的 daily 语义**（§5）是 missed-slot 补发的关键，fixtures 必须覆盖「整天错过仍补发一次」与「已消费不再补发」两条；
-- 交付端口在 Swift 侧为 `(_ recordId: String, _ framing: String, _ task: CronTask) async -> Bool`，投递目标由宿主注入（绑定会话时投进该会话，否则投进调用方上下文）；
+- 交付端口在 Swift 侧为 `@ContextTreeActor (recordId, framing, task) async throws -> Bool`（与运行时同隔离域，故能拿到活的 `CronTask` 而不必把它标成 Sendable；`throws` 对应来源里 `await deliver(...)` 的 try/catch），投递目标由宿主注入（绑定会话时投进该会话，否则投进调用方上下文）；
 - **生成的 id 不进 fixtures**（含毫秒与随机后缀），fixtures 只断言 id 形状与唯一性；
-- 持久化用 S18 的文件后端（沙盒内 Application Support），原子写沿用「临时文件 + rename」；
+- 持久化用 S18 的文件后端（沙盒内 Application Support），原子写复用 `LocalFileSystem.writeAtomic`（临时文件 + 替换目标；**`moveItem` 在目标已存在时会失败**，只写一次的文件看起来正常、第二次以后全丢——本项目在 cron 存储上踩过一次，已把发布器改成 `replaceItemAt` 优先并公开复用）；
+- **星期换算是减一不是取模**：Foundation `Calendar.weekday` 是 1=周日…7=周六，cron 约定是 0=周日…6=周六；来源的 `date.weekday % 7` 用的是 1=周一…7=周日的编号，结论等价于这里的减一——照抄取模会把周日算成 1、周五算成 6；
+- **工具结果文本按「键排序」的规范 JSON 比对**：Swift 侧 `JSONValue.jsonData()` 走 `JSONSerialization(.sortedKeys)`，而 Dart 的 `jsonEncode` 保插入序，故导出器侧有 `_canonicalJson`（递归按字典序编码）供文本比对使用；
+- **JSON 顶层标量不能走 `JSONSerialization`**（会抛 ObjC 异常，Swift 接不住、测试进程直接崩）：JSONL 历史直接拼字节写，单个字符串的 JSON 转义自己实现（`cronJsonStringLiteral`，转义规则与 `jsonEncode` 一致）；
+- **时区也注入**（`CronService(timeZone:)`，缺省 `TimeZone.current`）：fixtures 钉 UTC，生产用当前时区。与之配套，导出器自检 `TZ=UTC`（见 `tool/export_fixtures/README.md`）；
+- **用例自带输入**（含 CRUD 操作表与运行时场景表）：有状态场景的「操作序列」也进 fixture，Swift 侧按同一张表驱动，避免两端各抄一份脚本；
+- **每个 fixture 运行器结尾断言「至少比对过一次」**：参数化用例在一条都没跑到时表现为全绿，空跑的 fixture 比没有 fixture 更危险。

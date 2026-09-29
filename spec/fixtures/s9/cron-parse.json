@@ -1,6 +1,7 @@
 {
   "name": "cron-parse",
   "kind": "cron-parse",
+  "localZone": "UTC",
   "cases": [
     {
       "scenario": "parse",
@@ -582,76 +583,36 @@
       "label": "匹配：分/时/月/日/周，日与周同时受限时任一匹配",
       "input": [
         {
-          "input": {
-            "expression": "*/15 * * * *",
-            "local": "2026-03-09T10:15:00"
-          },
-          "expect": {
-            "matches": true
-          }
+          "expression": "*/15 * * * *",
+          "local": "2026-03-09T10:15:00"
         },
         {
-          "input": {
-            "expression": "*/15 * * * *",
-            "local": "2026-03-09T10:16:00"
-          },
-          "expect": {
-            "matches": false
-          }
+          "expression": "*/15 * * * *",
+          "local": "2026-03-09T10:16:00"
         },
         {
-          "input": {
-            "expression": "0 9 * * 1-5",
-            "local": "2026-03-09T09:00:00"
-          },
-          "expect": {
-            "matches": true
-          }
+          "expression": "0 9 * * 1-5",
+          "local": "2026-03-09T09:00:00"
         },
         {
-          "input": {
-            "expression": "0 9 * * 1-5",
-            "local": "2026-03-08T09:00:00"
-          },
-          "expect": {
-            "matches": false
-          }
+          "expression": "0 9 * * 1-5",
+          "local": "2026-03-08T09:00:00"
         },
         {
-          "input": {
-            "expression": "0 9 13 * 5",
-            "local": "2026-03-13T09:00:00"
-          },
-          "expect": {
-            "matches": true
-          }
+          "expression": "0 9 13 * 5",
+          "local": "2026-03-13T09:00:00"
         },
         {
-          "input": {
-            "expression": "0 9 14 * 5",
-            "local": "2026-03-13T09:00:00"
-          },
-          "expect": {
-            "matches": true
-          }
+          "expression": "0 9 14 * 5",
+          "local": "2026-03-13T09:00:00"
         },
         {
-          "input": {
-            "expression": "0 9 * * *",
-            "local": "2026-03-14T09:00:00"
-          },
-          "expect": {
-            "matches": true
-          }
+          "expression": "0 9 * * *",
+          "local": "2026-03-14T09:00:00"
         },
         {
-          "input": {
-            "expression": "0 9 13 * 5",
-            "local": "2026-03-14T09:00:00"
-          },
-          "expect": {
-            "matches": false
-          }
+          "expression": "0 9 13 * 5",
+          "local": "2026-03-14T09:00:00"
         }
       ],
       "expect": [
@@ -686,49 +647,24 @@
       "label": "下一触发分钟：严格大于锚点、本地时间语义",
       "input": [
         {
-          "input": {
-            "expression": "*/15 * * * *",
-            "after": "2026-03-09T10:00:00Z"
-          },
-          "expect": {
-            "next": "2026-03-09T10:15:00.000Z"
-          }
+          "expression": "*/15 * * * *",
+          "after": "2026-03-09T10:00:00Z"
         },
         {
-          "input": {
-            "expression": "*/15 * * * *",
-            "after": "2026-03-09T10:15:00Z"
-          },
-          "expect": {
-            "next": "2026-03-09T10:30:00.000Z"
-          }
+          "expression": "*/15 * * * *",
+          "after": "2026-03-09T10:15:00Z"
         },
         {
-          "input": {
-            "expression": "0 9 * * *",
-            "after": "2026-03-09T10:00:00Z"
-          },
-          "expect": {
-            "next": "2026-03-10T01:00:00.000Z"
-          }
+          "expression": "0 9 * * *",
+          "after": "2026-03-09T10:00:00Z"
         },
         {
-          "input": {
-            "expression": "0 0 29 2 *",
-            "after": "2026-01-01T00:00:00Z"
-          },
-          "expect": {
-            "next": "2028-02-28T16:00:00.000Z"
-          }
+          "expression": "0 0 29 2 *",
+          "after": "2026-01-01T00:00:00Z"
         },
         {
-          "input": {
-            "expression": "0 0 29 2 *",
-            "after": "2028-02-28T00:00:00Z"
-          },
-          "expect": {
-            "next": "2028-02-28T16:00:00.000Z"
-          }
+          "expression": "0 0 29 2 *",
+          "after": "2028-02-28T00:00:00Z"
         }
       ],
       "expect": [
@@ -739,13 +675,13 @@
           "next": "2026-03-09T10:30:00.000Z"
         },
         {
-          "next": "2026-03-10T01:00:00.000Z"
+          "next": "2026-03-10T09:00:00.000Z"
         },
         {
-          "next": "2028-02-28T16:00:00.000Z"
+          "next": "2028-02-29T00:00:00.000Z"
         },
         {
-          "next": "2028-02-28T16:00:00.000Z"
+          "next": "2028-02-29T00:00:00.000Z"
         }
       ]
     }

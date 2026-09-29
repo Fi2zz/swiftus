@@ -13,8 +13,16 @@ private actor Deliveries {
     }
 }
 
+/// 到期等待超时的失败形态。
+enum ScheduleRuntimeTestError: Error, Equatable {
+    case deliveryTimeout(expected: Int)
+}
+
 /// 规格 S8 §10：到期运行时（对齐 Dart `schedule_runtime_test.dart` 5 例；
 /// 与 Dart 测试同策略：真实时钟 + 毫秒级短延迟）。
+///
+/// **等待一律有界轮询，不用固定 sleep**：Dart 侧靠测试机空闲跑过，release 优化下
+/// 叠加 300+ 用例并发时 250ms 固定等待会踩空（本项目在 release 双跑时红过）。
 @ContextTreeActor
 @Suite("ScheduleRuntime")
 struct ScheduleRuntimeTests {
@@ -34,7 +42,9 @@ struct ScheduleRuntimeTests {
             }
         )
         runtime.requestDrive()
-        try await Task.sleep(for: .milliseconds(250))
+        // 有界等待首条到达：固定 sleep 在 release / 机器负载下会踩空（本项目在
+        // release 双跑时红过——60ms 的墙钟目标 + 250ms 固定等待不够稳）。
+        try await waitForDeliveries(deliveries, atLeast: 1)
         #expect(await deliveries.texts.count == 1)
         #expect(await deliveries.texts.first?.contains(#"reminder_prompt_json: "到点了""#) == true)
         #expect(try foldScheduleEvents(session.ownEvents).active.isEmpty)
@@ -130,7 +140,7 @@ struct ScheduleRuntimeTests {
             }
         )
         runtime.requestDrive()
-        try await Task.sleep(for: .milliseconds(250))
+        try await waitForDeliveries(deliveries, atLeast: 1)
         #expect(await deliveries.texts.count == 1)
         #expect(await deliveries.texts.first?.contains("[SCHEDULE REMINDER BATCH]") == true)
         #expect(await deliveries.texts.first?.contains(#""reminder_prompt":"检查构建""#) == true)
@@ -138,6 +148,21 @@ struct ScheduleRuntimeTests {
         #expect(folded.active.count == 1)
         #expect(folded.active.first.map { $0.scheduledAt > Date() } == true)
         await runtime.dispose()
+    }
+
+    /// 有界等待「至少投递了 count 条」；超时抛错（让用例失败，而不是挂死）。
+    private func waitForDeliveries(
+        _ deliveries: Deliveries,
+        atLeast count: Int,
+        timeout: Duration = .seconds(5)
+    ) async throws {
+        let deadline = ContinuousClock.now + timeout
+        while await deliveries.texts.count < count {
+            guard ContinuousClock.now < deadline else {
+                throw ScheduleRuntimeTestError.deliveryTimeout(expected: count)
+            }
+            try await Task.sleep(for: .milliseconds(2))
+        }
     }
 
     /// at 一次性创建载荷。

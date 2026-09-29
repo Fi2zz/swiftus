@@ -1,34 +1,104 @@
 {
   "name": "cron-runtime",
   "kind": "cron-runtime",
+  "localZone": "UTC",
   "now": "2026-03-09T10:00:00.000Z",
   "cases": [
     {
       "scenario": "delivery",
-      "label": "投递：返回假不消费时段且下 tick 重试、抛错不消费、交付成功才写运行戳与历史",
+      "label": "投递：返回假不消费时段且下 tick 重试、抛错不消费、交付成功才写运行戳与历史、at 消费后不再触发、单任务故障隔离",
+      "input": {
+        "at": "2026-03-09T09:00:00Z",
+        "scenarios": [
+          {
+            "name": "refuse",
+            "tasks": [
+              {
+                "id": "refused",
+                "prompt": "被拒",
+                "at": "2026-03-09T09:00:00Z"
+              }
+            ],
+            "deliver": "refuse-then-accept",
+            "ticks": 3,
+            "watchTask": "refused"
+          },
+          {
+            "name": "throw",
+            "tasks": [
+              {
+                "id": "boom",
+                "prompt": "抛错",
+                "at": "2026-03-09T09:00:00Z"
+              }
+            ],
+            "deliver": "throw",
+            "ticks": 1,
+            "watchTask": "boom"
+          },
+          {
+            "name": "isolate",
+            "tasks": [
+              {
+                "id": "ok-1",
+                "prompt": "好的",
+                "at": "2026-03-09T09:00:00Z"
+              },
+              {
+                "id": "bad",
+                "prompt": "坏的",
+                "at": "2026-03-09T09:00:00Z"
+              }
+            ],
+            "deliver": "throw-on:bad",
+            "ticks": 1,
+            "watchTask": null
+          }
+        ]
+      },
       "expect": {
         "afterRefuse": {
           "lastRunAt": null,
+          "firedAt": null,
           "historyCount": 0,
-          "warned": 0
+          "deliverAttempts": 1,
+          "warned": 1
         },
         "afterAccept": {
-          "lastRunAt": null,
-          "historyCount": 0,
-          "deliveredCount": 0
+          "lastRunAt": "2026-03-09T10:00:00.000Z",
+          "firedAt": "2026-03-09T10:00:00.000Z",
+          "historyCount": 1,
+          "deliverAttempts": 2,
+          "warned": 1
+        },
+        "afterConsumed": {
+          "historyCount": 1,
+          "deliverAttempts": 2,
+          "warned": 1
         },
         "afterThrow": {
           "lastRunAt": null,
-          "historyCount": 0
+          "firedAt": null,
+          "historyCount": 0,
+          "warned": 2
         },
         "isolated": {
-          "goodDelivered": 0
+          "goodDelivered": 1,
+          "warned": 3
         }
       }
     },
     {
       "scenario": "run-now",
       "label": "runTaskNow：任务不存在 → not-found；投递不可用 → delivery-unavailable",
+      "input": {
+        "missingId": "ghost",
+        "unavailableTask": {
+          "id": "busy",
+          "prompt": "忙",
+          "every": 600
+        }
+      },
       "expect": {
         "missing": "not-found",
         "unavailable": "delivery-unavailable"

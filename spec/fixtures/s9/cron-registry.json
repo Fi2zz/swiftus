@@ -1,11 +1,51 @@
 {
   "name": "cron-registry",
   "kind": "cron-registry",
+  "localZone": "UTC",
   "now": "2026-03-09T10:00:00.000Z",
   "cases": [
     {
       "scenario": "boot",
       "label": "装配：持久动态任务 → 配置任务 → 运行戳 → 启停覆盖；非法与重 id 跳过并告警",
+      "input": {
+        "storedTasks": [
+          {
+            "id": "kept",
+            "prompt": "保留",
+            "every": 60
+          },
+          {
+            "id": "broken",
+            "prompt": "坏",
+            "every": 1
+          },
+          {
+            "id": "dup",
+            "prompt": "与配置撞 id",
+            "every": 60
+          }
+        ],
+        "runStamps": {
+          "kept": {
+            "lastRunAt": "2026-03-09T09:00:00.000Z"
+          }
+        },
+        "overrides": {
+          "cfg": false
+        },
+        "configTasks": [
+          {
+            "id": "cfg",
+            "prompt": "配置任务",
+            "daily": "08:00"
+          },
+          {
+            "id": "dup",
+            "prompt": "配置里同名",
+            "every": 120
+          }
+        ]
+      },
       "expect": {
         "ids": [
           "kept",
@@ -22,6 +62,99 @@
     {
       "scenario": "crud",
       "label": "动态任务增删改：重 id / 非法输入被拒，改排期重置运行戳，覆盖与声明一致时归空",
+      "input": {
+        "ops": [
+          {
+            "op": "add",
+            "label": "added",
+            "input": {
+              "id": "dyn-1",
+              "prompt": "原提示",
+              "every": 30,
+              "sessionId": "s1"
+            }
+          },
+          {
+            "op": "add",
+            "label": "duplicate",
+            "input": {
+              "id": "dyn-1",
+              "prompt": "撞 id",
+              "every": 30
+            }
+          },
+          {
+            "op": "add",
+            "label": "invalid",
+            "input": {
+              "id": "dyn-2",
+              "prompt": "间隔太小",
+              "every": 5
+            }
+          },
+          {
+            "op": "update",
+            "label": "editPromptOnly",
+            "id": "dyn-1",
+            "patch": {
+              "prompt": "新提示"
+            }
+          },
+          {
+            "op": "update",
+            "label": "editSchedule",
+            "id": "dyn-1",
+            "patch": {
+              "daily": "07:15"
+            }
+          },
+          {
+            "op": "update",
+            "label": "editConfigTask",
+            "id": "cfg",
+            "patch": {
+              "prompt": "改配置"
+            }
+          },
+          {
+            "op": "remove",
+            "label": "removeConfigTask",
+            "id": "cfg"
+          },
+          {
+            "op": "remove",
+            "label": "removeMissing",
+            "id": "ghost"
+          },
+          {
+            "op": "setEnabled",
+            "label": "disabled",
+            "id": "dyn-1",
+            "enabled": false
+          },
+          {
+            "op": "setEnabled",
+            "label": "reEnabled",
+            "id": "dyn-1",
+            "enabled": true
+          },
+          {
+            "op": "remove",
+            "label": "removeDyn",
+            "id": "dyn-1"
+          },
+          {
+            "op": "add",
+            "label": "generated",
+            "input": {
+              "prompt": "自动生成 id",
+              "every": 60
+            },
+            "projectGenerated": true
+          }
+        ],
+        "configTasks": []
+      },
       "expect": {
         "added": {
           "id": "dyn-1",
@@ -66,7 +199,7 @@
           "sessionId": "s1",
           "lastRunAt": null,
           "firedAt": null,
-          "nextRunAt": "2026-03-08T23:15:00.000Z"
+          "nextRunAt": "2026-03-09T07:15:00.000Z"
         },
         "editConfigTask": {
           "error": "not-found"
@@ -101,8 +234,9 @@
           "sessionId": "s1",
           "lastRunAt": null,
           "firedAt": null,
-          "nextRunAt": "2026-03-08T23:15:00.000Z"
+          "nextRunAt": "2026-03-09T07:15:00.000Z"
         },
+        "removeDyn": "removed",
         "generated": {
           "shape": true,
           "boundSession": null,
@@ -110,14 +244,106 @@
             "everySeconds": 60
           }
         },
-        "remainingIds": [
-          "task-mmj0fgg0-amee"
-        ]
+        "remainingCount": 1,
+        "remainingAllGenerated": true
       }
     },
     {
       "scenario": "persistence",
       "label": "持久化只写显式字段表：内部缓存不落盘，删任务后表里不再有它",
+      "input": {
+        "ops": [
+          {
+            "op": "add",
+            "label": "added",
+            "input": {
+              "id": "dyn-1",
+              "prompt": "原提示",
+              "every": 30,
+              "sessionId": "s1"
+            }
+          },
+          {
+            "op": "add",
+            "label": "duplicate",
+            "input": {
+              "id": "dyn-1",
+              "prompt": "撞 id",
+              "every": 30
+            }
+          },
+          {
+            "op": "add",
+            "label": "invalid",
+            "input": {
+              "id": "dyn-2",
+              "prompt": "间隔太小",
+              "every": 5
+            }
+          },
+          {
+            "op": "update",
+            "label": "editPromptOnly",
+            "id": "dyn-1",
+            "patch": {
+              "prompt": "新提示"
+            }
+          },
+          {
+            "op": "update",
+            "label": "editSchedule",
+            "id": "dyn-1",
+            "patch": {
+              "daily": "07:15"
+            }
+          },
+          {
+            "op": "update",
+            "label": "editConfigTask",
+            "id": "cfg",
+            "patch": {
+              "prompt": "改配置"
+            }
+          },
+          {
+            "op": "remove",
+            "label": "removeConfigTask",
+            "id": "cfg"
+          },
+          {
+            "op": "remove",
+            "label": "removeMissing",
+            "id": "ghost"
+          },
+          {
+            "op": "setEnabled",
+            "label": "disabled",
+            "id": "dyn-1",
+            "enabled": false
+          },
+          {
+            "op": "setEnabled",
+            "label": "reEnabled",
+            "id": "dyn-1",
+            "enabled": true
+          },
+          {
+            "op": "remove",
+            "label": "removeDyn",
+            "id": "dyn-1"
+          },
+          {
+            "op": "add",
+            "label": "generated",
+            "input": {
+              "prompt": "自动生成 id",
+              "every": 60
+            },
+            "projectGenerated": true
+          }
+        ],
+        "configTasks": []
+      },
       "expect": {
         "savedTaskKeys": [
           [

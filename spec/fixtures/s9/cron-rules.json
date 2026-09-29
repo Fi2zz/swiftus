@@ -1,12 +1,100 @@
 {
   "name": "cron-rules",
   "kind": "cron-rules",
+  "localZone": "UTC",
   "now": "2026-03-09T10:00:00.000Z",
   "startedAt": "2026-03-09T08:00:00.000Z",
   "cases": [
     {
       "scenario": "validate",
       "label": "输入校验：id 形状、prompt、四选一、规则取值与消息逐字",
+      "input": [
+        {
+          "id": "a",
+          "prompt": "p",
+          "every": 10
+        },
+        {
+          "id": "a",
+          "prompt": "p",
+          "every": 10.5
+        },
+        {
+          "id": "a",
+          "prompt": "p",
+          "every": 9
+        },
+        {
+          "id": "a",
+          "prompt": "p",
+          "at": "2026-03-09T11:00:00Z"
+        },
+        {
+          "id": "a",
+          "prompt": "p",
+          "at": "不是时刻"
+        },
+        {
+          "id": "a",
+          "prompt": "p",
+          "daily": "09:30"
+        },
+        {
+          "id": "a",
+          "prompt": "p",
+          "daily": "24:00"
+        },
+        {
+          "id": "a",
+          "prompt": "p",
+          "daily": "9:30"
+        },
+        {
+          "id": "a",
+          "prompt": "p",
+          "cron": "*/5 * * * *"
+        },
+        {
+          "id": "a",
+          "prompt": "p",
+          "cron": "bad"
+        },
+        {
+          "id": "9bad",
+          "prompt": "p",
+          "every": 10
+        },
+        {
+          "id": "",
+          "prompt": "p",
+          "every": 10
+        },
+        {
+          "id": "a",
+          "prompt": "   ",
+          "every": 10
+        },
+        {
+          "id": "a",
+          "prompt": "p"
+        },
+        {
+          "id": "a",
+          "prompt": "p",
+          "every": 10,
+          "daily": "09:00"
+        },
+        {
+          "id": "a",
+          "prompt": "p",
+          "every": 0
+        },
+        {
+          "id": "a",
+          "prompt": "p",
+          "daily": ""
+        }
+      ],
       "expect": {
         "messages": [
           null,
@@ -32,6 +120,106 @@
     {
       "scenario": "due",
       "label": "到期判定与下次触发：at 已消费、every 锚点、daily 补发与已消费、cron 缓存、停用",
+      "input": [
+        {
+          "id": "t1",
+          "prompt": "做点什么",
+          "at": "2026-03-09T11:00:00Z",
+          "enabled": true,
+          "origin": "dynamic"
+        },
+        {
+          "id": "t2",
+          "prompt": "做点什么",
+          "at": "2026-03-09T09:00:00Z",
+          "enabled": true,
+          "origin": "dynamic"
+        },
+        {
+          "id": "t3",
+          "prompt": "做点什么",
+          "at": "2026-03-09T09:00:00Z",
+          "enabled": true,
+          "firedAt": "2026-03-09T09:00:00Z",
+          "origin": "dynamic"
+        },
+        {
+          "id": "t4",
+          "prompt": "做点什么",
+          "every": 600,
+          "enabled": true,
+          "lastRunAt": "2026-03-09T09:55:00Z",
+          "origin": "dynamic"
+        },
+        {
+          "id": "t5",
+          "prompt": "做点什么",
+          "every": 600,
+          "enabled": true,
+          "lastRunAt": "2026-03-09T09:50:00Z",
+          "origin": "dynamic"
+        },
+        {
+          "id": "t6",
+          "prompt": "做点什么",
+          "every": 3600,
+          "enabled": true,
+          "origin": "dynamic"
+        },
+        {
+          "id": "t7",
+          "prompt": "做点什么",
+          "every": 10.5,
+          "enabled": true,
+          "lastRunAt": "2026-03-09T09:59:56Z",
+          "origin": "dynamic"
+        },
+        {
+          "id": "t8",
+          "prompt": "做点什么",
+          "daily": "11:00",
+          "enabled": true,
+          "origin": "dynamic"
+        },
+        {
+          "id": "t9",
+          "prompt": "做点什么",
+          "daily": "09:00",
+          "enabled": true,
+          "origin": "dynamic"
+        },
+        {
+          "id": "t10",
+          "prompt": "做点什么",
+          "daily": "09:00",
+          "enabled": true,
+          "lastRunAt": "2026-03-09T09:00:00Z",
+          "origin": "dynamic"
+        },
+        {
+          "id": "t11",
+          "prompt": "做点什么",
+          "cron": "*/15 * * * *",
+          "enabled": true,
+          "origin": "dynamic"
+        },
+        {
+          "id": "t12",
+          "prompt": "做点什么",
+          "cron": "*/15 * * * *",
+          "enabled": true,
+          "lastRunAt": "2026-03-09T09:45:00Z",
+          "origin": "dynamic"
+        },
+        {
+          "id": "t13",
+          "prompt": "做点什么",
+          "every": 10,
+          "enabled": true,
+          "enabledOverride": false,
+          "origin": "dynamic"
+        }
+      ],
       "expect": [
         {
           "label": "at：未到点",
@@ -70,18 +258,18 @@
         },
         {
           "label": "daily：今天这格未到",
-          "due": "2026-03-09T03:00:00.000Z",
-          "nextRunAt": "2026-03-09T03:00:00.000Z"
+          "due": null,
+          "nextRunAt": "2026-03-09T11:00:00.000Z"
         },
         {
           "label": "daily：今天这格已过且未运行 → 补发",
-          "due": "2026-03-09T01:00:00.000Z",
-          "nextRunAt": "2026-03-09T01:00:00.000Z"
+          "due": "2026-03-09T09:00:00.000Z",
+          "nextRunAt": "2026-03-09T09:00:00.000Z"
         },
         {
           "label": "daily：今天这格已消费 → 不再补发",
           "due": null,
-          "nextRunAt": "2026-03-10T01:00:00.000Z"
+          "nextRunAt": "2026-03-10T09:00:00.000Z"
         },
         {
           "label": "cron：未到下一分钟",
@@ -103,6 +291,13 @@
     {
       "scenario": "id-gen",
       "label": "生成 id 的形状与唯一性（值不入 fixture）",
+      "input": {
+        "now": "2026-03-09T10:00:00.000Z",
+        "randomSuffixes": [
+          1,
+          2
+        ]
+      },
       "expect": {
         "shapeMatches": true,
         "distinctWithSameInstant": true

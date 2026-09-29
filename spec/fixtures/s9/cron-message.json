@@ -1,12 +1,41 @@
 {
   "name": "cron-message",
   "kind": "cron-message",
+  "localZone": "UTC",
   "now": "2026-03-09T10:00:00.000Z",
   "startedAt": "2026-03-09T08:00:00.000Z",
   "cases": [
     {
       "scenario": "view",
       "label": "模型可见视图：schedule 四选一、daily 已消费顺延一天、at 已消费无下次",
+      "input": {
+        "views": {
+          "daily": {
+            "id": "t-daily",
+            "prompt": "做点什么",
+            "daily": "07:00",
+            "enabled": true,
+            "lastRunAt": "2026-03-08T07:00:00Z",
+            "sessionId": "s9",
+            "origin": "dynamic"
+          },
+          "firedAt": {
+            "id": "t-at",
+            "prompt": "做点什么",
+            "at": "2026-03-09T09:00:00Z",
+            "enabled": true,
+            "firedAt": "2026-03-09T09:00:00Z",
+            "origin": "dynamic"
+          },
+          "cron": {
+            "id": "t-cron",
+            "prompt": "做点什么",
+            "cron": "*/15 * * * *",
+            "enabled": true,
+            "origin": "dynamic"
+          }
+        }
+      },
       "expect": {
         "daily": {
           "id": "t-daily",
@@ -19,7 +48,7 @@
           "sessionId": "s9",
           "lastRunAt": "2026-03-08T07:00:00.000Z",
           "firedAt": null,
-          "nextRunAt": "2026-03-08T23:00:00.000Z"
+          "nextRunAt": "2026-03-09T07:00:00.000Z"
         },
         "firedAt": {
           "id": "t-at",
@@ -52,6 +81,12 @@
     {
       "scenario": "framing",
       "label": "触发 framing 逐行固定（防注入设计，不许改写）",
+      "input": {
+        "id": "t-1",
+        "prompt": "把昨天的会议纪要发出去",
+        "slot": "2026-03-09T09:00:00Z",
+        "firedAt": "2026-03-09T09:00:01Z"
+      },
       "expect": {
         "framing": "[cron] Scheduled task \"t-1\" fired.\nScheduled for: 2026-03-09T09:00:00.000Z\nFired at: 2026-03-09T09:00:01.000Z\n\nThis is an automated task submitted by the cron plugin, not a message from the user.\nExecute the task inside <task> now, then report the result concisely.\n\n<task>\n把昨天的会议纪要发出去\n</task>"
       }

@@ -14,6 +14,7 @@ import 'dart:io';
 import 'package:conatus_cron/conatus_cron.dart';
 
 Future<void> main() async {
+  _requireFixedZone();
   final Directory outDir = _outputDir();
   outDir.createSync(recursive: true);
   final Map<String, Future<Map<String, Object?>> Function()> fixtures =
@@ -38,9 +39,51 @@ Future<void> main() async {
   }
 }
 
+/// cron 规则与到期判定基于**本地时区**，故本导出器必须在固定时区下跑，
+/// 否则 `daily` 与小时级 cron 的期望值会随导出机器的时区漂移
+/// （本项目已踩过一次：`daily 09:00` 在东八区落到 01:00Z、四年搜索命中错日）。
+/// 运行方式：`TZ=UTC dart --packages=… export_s9.dart`。
+void _requireFixedZone() {
+  final String zone = Platform.environment['TZ'] ?? '';
+  if (zone != 'UTC') {
+    stderr.writeln(
+      'S9 fixtures 依赖本地时区语义：请用 TZ=UTC 运行本导出器（当前 TZ="$zone"）。',
+    );
+    exit(2);
+  }
+}
+
 Directory _outputDir() {
   final Directory here = File.fromUri(Platform.script).parent;
   return Directory('${here.parent.parent.path}/spec/fixtures/s9');
+}
+
+/// 规范 JSON 编码：**对象键按字典序排序**后编码。
+///
+/// Swift 侧 `JSONValue.jsonData()` 走 `JSONSerialization(.sortedKeys)`，故工具结果
+/// 文本比对必须两端同序——Dart 的 `jsonEncode` 保插入序，直接比会整条用例红。
+String _canonicalJson(Object? value) {
+  final StringBuffer buffer = StringBuffer();
+  void write(Object? node) {
+    if (node is Map) {
+      final List<String> keys =
+          node.keys.map((Object? k) => k! as String).toList()..sort();
+      buffer.write('{');
+      buffer.write(keys
+          .map((String key) => '${jsonEncode(key)}:${_canonicalJson(node[key])}')
+          .join(','));
+      buffer.write('}');
+    } else if (node is List) {
+      buffer.write('[');
+      buffer.write(node.map(_canonicalJson).join(','));
+      buffer.write(']');
+    } else {
+      buffer.write(jsonEncode(node));
+    }
+  }
+
+  write(value);
+  return buffer.toString();
 }
 
 String _code(Object error) =>
@@ -71,6 +114,8 @@ Future<Map<String, Object?>> _cronParse() async {
   return <String, Object?>{
     'name': 'cron-parse',
     'kind': 'cron-parse',
+    // 规则语义基于本地时区 → 导出必须钉死时区（本仓统一用 TZ=UTC 跑本导出器）。
+    'localZone': 'UTC',
     'cases': <Map<String, Object?>>[
       <String, Object?>{
         'scenario': 'parse',
@@ -137,7 +182,9 @@ Future<Map<String, Object?>> _cronParse() async {
       <String, Object?>{
         'scenario': 'match',
         'label': '匹配：分/时/月/日/周，日与周同时受限时任一匹配',
-        'input': _matchCases(),
+        'input': <Object?>[
+          for (final Map<String, Object?> row in _matchCases()) row['input'],
+        ],
         'expect': <Object?>[
           for (final Map<String, Object?> row in _matchCases())
             row['expect'],
@@ -146,7 +193,9 @@ Future<Map<String, Object?>> _cronParse() async {
       <String, Object?>{
         'scenario': 'next-slot',
         'label': '下一触发分钟：严格大于锚点、本地时间语义',
-        'input': _nextCases(),
+        'input': <Object?>[
+          for (final Map<String, Object?> row in _nextCases()) row['input'],
+        ],
         'expect': <Object?>[
           for (final Map<String, Object?> row in _nextCases())
             row['expect'],
@@ -219,7 +268,67 @@ List<Map<String, Object?>> _nextCases() {
 
 // ───────────────────────────── 规则与到期判定 ─────────────────────────────
 
-/// 造一个内部任务（不落盘、不经服务入口）。
+/// 内部任务的**数据化描述**（既进 fixture 作为输入，也在导出器内构造 CronTask）。
+///
+/// 纯函数型场景（校验 / 到期判定 / 视图）的输入必须写进 fixture——否则 Swift 侧
+/// 只能手抄一份输入矩阵，fixture 就不再是「行为级真相」而是「答案集」。
+Map<String, Object?> _taskSpec({
+  required String id,
+  String? prompt = '做点什么',
+  String? at,
+  num? every,
+  String? daily,
+  String? cron,
+  bool enabled = true,
+  bool? enabledOverride,
+  String? lastRunAt,
+  String? firedAt,
+  String? sessionId,
+  String origin = 'dynamic',
+}) =>
+    <String, Object?>{
+      'id': id,
+      'prompt': prompt,
+      if (at != null) 'at': at,
+      if (every != null) 'every': every,
+      if (daily != null) 'daily': daily,
+      if (cron != null) 'cron': cron,
+      'enabled': enabled,
+      if (enabledOverride != null) 'enabledOverride': enabledOverride,
+      if (lastRunAt != null) 'lastRunAt': lastRunAt,
+      if (firedAt != null) 'firedAt': firedAt,
+      if (sessionId != null) 'sessionId': sessionId,
+      'origin': origin,
+    };
+
+/// 按 `_taskSpec` 的形状造一个内部任务（不落盘、不经服务入口）。
+CronTask _taskFromSpec(Map<String, Object?> spec) {
+  final Object? lastRunAt = spec['lastRunAt'];
+  final Object? firedAt = spec['firedAt'];
+  final Object? enabledOverride = spec['enabledOverride'];
+  final CronTask task = CronTask(
+    id: spec['id']! as String,
+    prompt: spec['prompt'] as String? ?? '做点什么',
+    at: spec['at'] as String?,
+    every: spec['every'] as num?,
+    daily: spec['daily'] as String?,
+    cron: spec['cron'] as String?,
+    sessionId: spec['sessionId'] as String?,
+    enabled: spec['enabled'] as bool? ?? true,
+    origin: spec['origin'] == 'config'
+        ? CronTaskOrigin.config
+        : CronTaskOrigin.dynamic,
+  )
+    ..enabledOverride = enabledOverride as bool?
+    ..lastRunAt = lastRunAt == null ? null : DateTime.parse(lastRunAt as String)
+    ..firedAt = firedAt == null ? null : DateTime.parse(firedAt as String);
+  final String? cron = task.cron;
+  if (cron != null) {
+    task.cronParsed = parseCronExpression(cron);
+  }
+  return task;
+}
+
 CronTask _task({
   required String id,
   String? at,
@@ -232,26 +341,20 @@ CronTask _task({
   String? firedAt,
   String? sessionId,
   CronTaskOrigin origin = CronTaskOrigin.dynamic,
-}) {
-  final CronTask task = CronTask(
-    id: id,
-    prompt: '做点什么',
-    at: at,
-    every: every,
-    daily: daily,
-    cron: cron,
-    sessionId: sessionId,
-    enabled: enabled,
-    origin: origin,
-  )
-    ..enabledOverride = enabledOverride
-    ..lastRunAt = lastRunAt == null ? null : DateTime.parse(lastRunAt)
-    ..firedAt = firedAt == null ? null : DateTime.parse(firedAt);
-  if (cron != null) {
-    task.cronParsed = parseCronExpression(cron);
-  }
-  return task;
-}
+}) =>
+    _taskFromSpec(_taskSpec(
+      id: id,
+      at: at,
+      every: every,
+      daily: daily,
+      cron: cron,
+      enabled: enabled,
+      enabledOverride: enabledOverride,
+      lastRunAt: lastRunAt,
+      firedAt: firedAt,
+      sessionId: sessionId,
+      origin: origin == CronTaskOrigin.config ? 'config' : 'dynamic',
+    ));
 
 Map<String, Object?> _rulesView(
   CronTask task,
@@ -265,31 +368,33 @@ Future<Map<String, Object?>> _cronRules() async {
   final DateTime now = DateTime.parse('2026-03-09T10:00:00Z');
   final DateTime startedAt = DateTime.parse('2026-03-09T08:00:00Z');
 
+  // 校验输入矩阵（进 fixture）：顺序即校验顺序的观察顺序。
+  final List<Map<String, Object?>> validationInputs = <Map<String, Object?>>[
+    <String, Object?>{'id': 'a', 'prompt': 'p', 'every': 10},
+    <String, Object?>{'id': 'a', 'prompt': 'p', 'every': 10.5},
+    <String, Object?>{'id': 'a', 'prompt': 'p', 'every': 9},
+    <String, Object?>{'id': 'a', 'prompt': 'p', 'at': '2026-03-09T11:00:00Z'},
+    <String, Object?>{'id': 'a', 'prompt': 'p', 'at': '不是时刻'},
+    <String, Object?>{'id': 'a', 'prompt': 'p', 'daily': '09:30'},
+    <String, Object?>{'id': 'a', 'prompt': 'p', 'daily': '24:00'},
+    <String, Object?>{'id': 'a', 'prompt': 'p', 'daily': '9:30'},
+    <String, Object?>{'id': 'a', 'prompt': 'p', 'cron': '*/5 * * * *'},
+    <String, Object?>{'id': 'a', 'prompt': 'p', 'cron': 'bad'},
+    <String, Object?>{'id': '9bad', 'prompt': 'p', 'every': 10},
+    <String, Object?>{'id': '', 'prompt': 'p', 'every': 10},
+    <String, Object?>{'id': 'a', 'prompt': '   ', 'every': 10},
+    <String, Object?>{'id': 'a', 'prompt': 'p'},
+    <String, Object?>{
+      'id': 'a',
+      'prompt': 'p',
+      'every': 10,
+      'daily': '09:00',
+    },
+    <String, Object?>{'id': 'a', 'prompt': 'p', 'every': 0},
+    <String, Object?>{'id': 'a', 'prompt': 'p', 'daily': ''},
+  ];
   final List<Object?> validations = <Object?>[
-    for (final Map<String, Object?> input in <Map<String, Object?>>[
-      <String, Object?>{'id': 'a', 'prompt': 'p', 'every': 10},
-      <String, Object?>{'id': 'a', 'prompt': 'p', 'every': 10.5},
-      <String, Object?>{'id': 'a', 'prompt': 'p', 'every': 9},
-      <String, Object?>{'id': 'a', 'prompt': 'p', 'at': '2026-03-09T11:00:00Z'},
-      <String, Object?>{'id': 'a', 'prompt': 'p', 'at': '不是时刻'},
-      <String, Object?>{'id': 'a', 'prompt': 'p', 'daily': '09:30'},
-      <String, Object?>{'id': 'a', 'prompt': 'p', 'daily': '24:00'},
-      <String, Object?>{'id': 'a', 'prompt': 'p', 'daily': '9:30'},
-      <String, Object?>{'id': 'a', 'prompt': 'p', 'cron': '*/5 * * * *'},
-      <String, Object?>{'id': 'a', 'prompt': 'p', 'cron': 'bad'},
-      <String, Object?>{'id': '9bad', 'prompt': 'p', 'every': 10},
-      <String, Object?>{'id': '', 'prompt': 'p', 'every': 10},
-      <String, Object?>{'id': 'a', 'prompt': '   ', 'every': 10},
-      <String, Object?>{'id': 'a', 'prompt': 'p'},
-      <String, Object?>{
-        'id': 'a',
-        'prompt': 'p',
-        'every': 10,
-        'daily': '09:00',
-      },
-      <String, Object?>{'id': 'a', 'prompt': 'p', 'every': 0},
-      <String, Object?>{'id': 'a', 'prompt': 'p', 'daily': ''},
-    ])
+    for (final Map<String, Object?> input in validationInputs)
       validateTaskInput((
         id: input['id'],
         prompt: input['prompt'],
@@ -300,32 +405,56 @@ Future<Map<String, Object?>> _cronRules() async {
       )),
   ];
 
-  // 到期判定矩阵：每个任务在固定 now 下的 dueSlot / nextRunAt。
-  final List<Map<String, Object?>> dueRows =
-      <Map<String, Object?>>[
-    <String, Object?>{'label': 'at：未到点', 'task': _task(id: 't1', at: '2026-03-09T11:00:00Z')},
-    <String, Object?>{'label': 'at：到点即触发', 'task': _task(id: 't2', at: '2026-03-09T09:00:00Z')},
+  // 到期判定矩阵：任务描述（进 fixture）与在固定 now 下的 dueSlot / nextRunAt。
+  final List<Map<String, Object?>> dueRows = <Map<String, Object?>>[
+    <String, Object?>{
+      'label': 'at：未到点',
+      'spec': _taskSpec(id: 't1', at: '2026-03-09T11:00:00Z'),
+    },
+    <String, Object?>{
+      'label': 'at：到点即触发',
+      'spec': _taskSpec(id: 't2', at: '2026-03-09T09:00:00Z'),
+    },
     <String, Object?>{
       'label': 'at：已消费不再触发',
-      'task': _task(id: 't3', at: '2026-03-09T09:00:00Z', firedAt: '2026-03-09T09:00:00Z'),
+      'spec': _taskSpec(
+        id: 't3',
+        at: '2026-03-09T09:00:00Z',
+        firedAt: '2026-03-09T09:00:00Z',
+      ),
     },
-    <String, Object?>{'label': 'every：未到间隔', 'task': _task(id: 't4', every: 600, lastRunAt: '2026-03-09T09:55:00Z')},
-    <String, Object?>{'label': 'every：到间隔', 'task': _task(id: 't5', every: 600, lastRunAt: '2026-03-09T09:50:00Z')},
-    <String, Object?>{'label': 'every：从未运行，以装配时刻为锚', 'task': _task(id: 't6', every: 3600)},
+    <String, Object?>{
+      'label': 'every：未到间隔',
+      'spec': _taskSpec(id: 't4', every: 600, lastRunAt: '2026-03-09T09:55:00Z'),
+    },
+    <String, Object?>{
+      'label': 'every：到间隔',
+      'spec': _taskSpec(id: 't5', every: 600, lastRunAt: '2026-03-09T09:50:00Z'),
+    },
+    <String, Object?>{
+      'label': 'every：从未运行，以装配时刻为锚',
+      'spec': _taskSpec(id: 't6', every: 3600),
+    },
     <String, Object?>{
       'label': 'every：允许小数间隔',
-      'task': _task(id: 't7', every: 10.5, lastRunAt: '2026-03-09T09:59:56Z'),
+      'spec': _taskSpec(id: 't7', every: 10.5, lastRunAt: '2026-03-09T09:59:56Z'),
     },
-    <String, Object?>{'label': 'daily：今天这格未到', 'task': _task(id: 't8', daily: '11:00')},
-    <String, Object?>{'label': 'daily：今天这格已过且未运行 → 补发', 'task': _task(id: 't9', daily: '09:00')},
+    <String, Object?>{'label': 'daily：今天这格未到', 'spec': _taskSpec(id: 't8', daily: '11:00')},
+    <String, Object?>{
+      'label': 'daily：今天这格已过且未运行 → 补发',
+      'spec': _taskSpec(id: 't9', daily: '09:00'),
+    },
     <String, Object?>{
       'label': 'daily：今天这格已消费 → 不再补发',
-      'task': _task(id: 't10', daily: '09:00', lastRunAt: '2026-03-09T09:00:00Z'),
+      'spec': _taskSpec(id: 't10', daily: '09:00', lastRunAt: '2026-03-09T09:00:00Z'),
     },
-    <String, Object?>{'label': 'cron：未到下一分钟', 'task': _task(id: 't11', cron: '*/15 * * * *')},
+    <String, Object?>{
+      'label': 'cron：未到下一分钟',
+      'spec': _taskSpec(id: 't11', cron: '*/15 * * * *'),
+    },
     <String, Object?>{
       'label': 'cron：下一分钟已到',
-      'task': _task(
+      'spec': _taskSpec(
         id: 't12',
         cron: '*/15 * * * *',
         lastRunAt: '2026-03-09T09:45:00Z',
@@ -333,33 +462,44 @@ Future<Map<String, Object?>> _cronRules() async {
     },
     <String, Object?>{
       'label': '停用覆盖为假 → 不触发且无下次',
-      'task': _task(id: 't13', every: 10, enabled: true, enabledOverride: false),
+      'spec': _taskSpec(id: 't13', every: 10, enabled: true, enabledOverride: false),
     },
   ];
 
   return <String, Object?>{
     'name': 'cron-rules',
     'kind': 'cron-rules',
+    'localZone': 'UTC',
     'now': formatCronInstant(now),
     'startedAt': formatCronInstant(startedAt),
     'cases': <Map<String, Object?>>[
       <String, Object?>{
         'scenario': 'validate',
         'label': '输入校验：id 形状、prompt、四选一、规则取值与消息逐字',
+        'input': <Object?>[
+          for (final Map<String, Object?> input in validationInputs) input,
+        ],
         'expect': <String, Object?>{'messages': validations},
       },
       <String, Object?>{
         'scenario': 'due',
         'label': '到期判定与下次触发：at 已消费、every 锚点、daily 补发与已消费、cron 缓存、停用',
+        'input': <Object?>[
+          for (final Map<String, Object?> row in dueRows) row['spec'],
+        ],
         'expect': <Object?>[
           for (final Map<String, Object?> row in dueRows)
             <String, Object?>{
               'label': row['label'],
               'due': formatCronInstant(
-                dueSlot(row['task']! as CronTask, now, startedAt),
+                dueSlot(
+                  _taskFromSpec(row['spec']! as Map<String, Object?>),
+                  now,
+                  startedAt,
+                ),
               ),
               'nextRunAt': _rulesView(
-                row['task']! as CronTask,
+                _taskFromSpec(row['spec']! as Map<String, Object?>),
                 now,
                 startedAt,
               )['nextRunAt'],
@@ -369,6 +509,11 @@ Future<Map<String, Object?>> _cronRules() async {
       <String, Object?>{
         'scenario': 'id-gen',
         'label': '生成 id 的形状与唯一性（值不入 fixture）',
+        'input': <String, Object?>{
+          'now': formatCronInstant(now),
+          // 熵源取值固定：只断言形状与同刻不同后缀的唯一性。
+          'randomSuffixes': <int>[1, 2],
+        },
         'expect': <String, Object?>{
           'shapeMatches': RegExp(r'^task-[0-9a-z]+-[0-9a-z]{4}$')
               .hasMatch(generateTaskId(now, 1)),
@@ -422,101 +567,192 @@ class MemoryCronStorage implements CronStorage {
   }
 }
 
+/// CRUD 操作表（进 fixture）：顺序即执行顺序，`label` 是投影键。
+///
+/// 把操作写成数据而不是只写在导出器代码里，Swift 侧就能按同一张表驱动
+/// （`S9` 运行器按 `op` 分派），不必手抄一遍操作序列。
+List<Map<String, Object?>> _crudOps() => <Map<String, Object?>>[
+      <String, Object?>{
+        'op': 'add',
+        'label': 'added',
+        'input': <String, Object?>{
+          'id': 'dyn-1',
+          'prompt': '原提示',
+          'every': 30,
+          'sessionId': 's1',
+        },
+      },
+      <String, Object?>{
+        'op': 'add',
+        'label': 'duplicate',
+        'input': <String, Object?>{'id': 'dyn-1', 'prompt': '撞 id', 'every': 30},
+      },
+      <String, Object?>{
+        'op': 'add',
+        'label': 'invalid',
+        'input': <String, Object?>{'id': 'dyn-2', 'prompt': '间隔太小', 'every': 5},
+      },
+      <String, Object?>{
+        'op': 'update',
+        'label': 'editPromptOnly',
+        'id': 'dyn-1',
+        'patch': <String, Object?>{'prompt': '新提示'},
+      },
+      <String, Object?>{
+        'op': 'update',
+        'label': 'editSchedule',
+        'id': 'dyn-1',
+        'patch': <String, Object?>{'daily': '07:15'},
+      },
+      <String, Object?>{
+        'op': 'update',
+        'label': 'editConfigTask',
+        'id': 'cfg',
+        'patch': <String, Object?>{'prompt': '改配置'},
+      },
+      <String, Object?>{
+        'op': 'remove',
+        'label': 'removeConfigTask',
+        'id': 'cfg',
+      },
+      <String, Object?>{
+        'op': 'remove',
+        'label': 'removeMissing',
+        'id': 'ghost',
+      },
+      <String, Object?>{'op': 'setEnabled', 'label': 'disabled', 'id': 'dyn-1', 'enabled': false},
+      <String, Object?>{'op': 'setEnabled', 'label': 'reEnabled', 'id': 'dyn-1', 'enabled': true},
+      <String, Object?>{'op': 'remove', 'label': 'removeDyn', 'id': 'dyn-1'},
+      <String, Object?>{
+        'op': 'add',
+        'label': 'generated',
+        'input': <String, Object?>{'prompt': '自动生成 id', 'every': 60},
+        // 自动生成的 id 含毫秒与随机后缀，只投影形状与会话绑定。
+        'projectGenerated': true,
+      },
+    ];
+
+/// 按操作表驱动服务，返回 `label -> 投影`（失败的操作投影成 `{error: 码}`）。
+Future<Map<String, Object?>> _runCrudOps(
+  CronService service,
+  List<Map<String, Object?>> ops,
+) async {
+  final Map<String, Object?> out = <String, Object?>{};
+  for (final Map<String, Object?> step in ops) {
+    final String label = step['label']! as String;
+    out[label] = await _guard(() async {
+      switch (step['op']! as String) {
+        case 'add':
+          final CronTaskView view = service.addDynamicTask(
+            (step['input']! as Map<String, Object?>).cast<String, Object?>(),
+          );
+          if (step['projectGenerated'] == true) {
+            return <String, Object?>{
+              'shape': RegExp(r'^task-[0-9a-z]+-[0-9a-z]{4}$').hasMatch(view.id),
+              'boundSession': view.sessionId,
+              'viewSchedule': view.schedule,
+            };
+          }
+          return view.toJson();
+        case 'update':
+          return service
+              .updateDynamicTask(
+                step['id']! as String,
+                (step['patch']! as Map<String, Object?>).cast<String, Object?>(),
+              )
+              .toJson();
+        case 'remove':
+          service.removeDynamicTask(step['id']! as String);
+          return 'removed';
+        case 'setEnabled':
+          return service
+              .setEnabled(step['id']! as String, step['enabled']! as bool)
+              .toJson();
+      }
+      return 'unknown-op';
+    });
+  }
+  return out;
+}
+
 /// kind = cron-registry：装配顺序、增删改、配置任务保护、持久化字段表。
 Future<Map<String, Object?>> _cronRegistry() async {
   final DateTime now = DateTime.parse('2026-03-09T10:00:00Z');
 
   // 装配：损坏的持久任务被跳过并告警，配置任务叠加，运行戳与覆盖恢复。
-  final MemoryCronStorage stored = MemoryCronStorage();
-  stored.saveTasks(
-    tasks: <Map<String, Object?>>[
+  final Map<String, Object?> bootInput = <String, Object?>{
+    'storedTasks': <Map<String, Object?>>[
       <String, Object?>{'id': 'kept', 'prompt': '保留', 'every': 60},
       <String, Object?>{'id': 'broken', 'prompt': '坏', 'every': 1},
       <String, Object?>{'id': 'dup', 'prompt': '与配置撞 id', 'every': 60},
     ],
-    runStamps: <String, CronRunStamp>{
-      'kept': CronRunStamp(lastRunAt: DateTime.parse('2026-03-09T09:00:00Z')),
+    'runStamps': <String, Object?>{
+      'kept': <String, Object?>{'lastRunAt': '2026-03-09T09:00:00.000Z'},
     },
-    overrides: <String, bool>{'cfg': false},
+    'overrides': <String, Object?>{'cfg': false},
+    'configTasks': <Map<String, Object?>>[
+      <String, Object?>{'id': 'cfg', 'prompt': '配置任务', 'daily': '08:00'},
+      <String, Object?>{'id': 'dup', 'prompt': '配置里同名', 'every': 120},
+    ],
+  };
+  final MemoryCronStorage stored = MemoryCronStorage();
+  stored.saveTasks(
+    tasks: (bootInput['storedTasks']! as List<Map<String, Object?>>)
+        .cast<Map<String, Object?>>(),
+    runStamps: <String, CronRunStamp>{
+      for (final MapEntry<String, Object?> entry
+          in (bootInput['runStamps']! as Map<String, Object?>).entries)
+        entry.key: CronRunStamp(
+          lastRunAt: DateTime.parse(
+            (entry.value! as Map<String, Object?>)['lastRunAt']! as String,
+          ),
+        ),
+    },
+    overrides: <String, bool>{
+      for (final MapEntry<String, Object?> entry
+          in (bootInput['overrides']! as Map<String, Object?>).entries)
+        entry.key: entry.value! as bool,
+    },
   );
   final List<String> warnings = <String>[];
   final CronService booted = CronService(
     storage: stored,
-    configTasks: <Map<String, Object?>>[
-      <String, Object?>{'id': 'cfg', 'prompt': '配置任务', 'daily': '08:00'},
-      <String, Object?>{'id': 'dup', 'prompt': '配置里同名', 'every': 120},
-    ],
+    configTasks: (bootInput['configTasks']! as List<Map<String, Object?>>)
+        .cast<Map<String, Object?>>(),
     clock: () => now,
     onWarning: warnings.add,
   );
 
-  // 动态任务 CRUD。
+  // 动态任务 CRUD（操作表进 fixture）。
+  final List<Map<String, Object?>> ops = _crudOps();
   final MemoryCronStorage storage = MemoryCronStorage();
   final CronService service =
       CronService(storage: storage, clock: () => now, onWarning: warnings.add);
-  final CronTaskView added = service.addDynamicTask(<String, Object?>{
-    'id': 'dyn-1',
-    'prompt': '原提示',
-    'every': 30,
-    'sessionId': 's1',
-  });
-  final Object? duplicate = await _guard(() async {
-    service.addDynamicTask(<String, Object?>{
-      'id': 'dyn-1',
-      'prompt': '撞 id',
-      'every': 30,
-    });
-    return 'added';
-  });
-  final Object? invalid = await _guard(() async {
-    service.addDynamicTask(<String, Object?>{
-      'id': 'dyn-2',
-      'prompt': '间隔太小',
-      'every': 5,
-    });
-    return 'added';
-  });
-  final CronTaskView editedPromptOnly =
-      service.updateDynamicTask('dyn-1', <String, Object?>{'prompt': '新提示'});
-  final CronTaskView editedSchedule = service.updateDynamicTask(
-    'dyn-1',
-    <String, Object?>{'daily': '07:15'},
+  final Map<String, Object?> projections = await _runCrudOps(service, ops);
+
+  final Map<String, Object?> persistInput = <String, Object?>{
+    'ops': ops,
+    'configTasks': <Map<String, Object?>>[],
+  };
+  final MemoryCronStorage persistStorage = MemoryCronStorage();
+  final CronService persistService = CronService(
+    storage: persistStorage,
+    configTasks: (persistInput['configTasks']! as List<Map<String, Object?>>)
+        .cast<Map<String, Object?>>(),
+    clock: () => now,
   );
-  final Object? editConfig = await _guard(() async {
-    service.updateDynamicTask('cfg', <String, Object?>{'prompt': '改配置'});
-    return 'edited';
-  });
-  final Object? removeConfig = await _guard(() async {
-    service.removeDynamicTask('cfg');
-    return 'removed';
-  });
-  final Object? removeMissing = await _guard(() async {
-    service.removeDynamicTask('ghost');
-    return 'removed';
-  });
-  final CronTaskView disabled = service.setEnabled('dyn-1', false);
-  final CronTaskView reEnabled = service.setEnabled('dyn-1', true);
-  service.removeDynamicTask('dyn-1');
-  final Object? generatedShape = await _guard(() async {
-    final CronTaskView view = service.addDynamicTask(<String, Object?>{
-      'prompt': '自动生成 id',
-      'every': 60,
-    });
-    return <String, Object?>{
-      'shape': RegExp(r'^task-[0-9a-z]+-[0-9a-z]{4}$').hasMatch(view.id),
-      'boundSession': view.sessionId,
-      'viewSchedule': view.schedule,
-    };
-  });
+  await _runCrudOps(persistService, ops);
 
   return <String, Object?>{
     'name': 'cron-registry',
     'kind': 'cron-registry',
+    'localZone': 'UTC',
     'now': formatCronInstant(now),
     'cases': <Map<String, Object?>>[
       <String, Object?>{
         'scenario': 'boot',
         'label': '装配：持久动态任务 → 配置任务 → 运行戳 → 启停覆盖；非法与重 id 跳过并告警',
+        'input': bootInput,
         'expect': <String, Object?>{
           'ids': [
             for (final CronTask t in booted.tasks) t.id,
@@ -533,35 +769,44 @@ Future<Map<String, Object?>> _cronRegistry() async {
       <String, Object?>{
         'scenario': 'crud',
         'label': '动态任务增删改：重 id / 非法输入被拒，改排期重置运行戳，覆盖与声明一致时归空',
+        'input': <String, Object?>{
+          'ops': ops,
+          'configTasks': <Map<String, Object?>>[],
+        },
         'expect': <String, Object?>{
-          'added': added.toJson(),
-          'duplicate': duplicate,
-          'invalid': invalid,
-          'editPromptOnly': editedPromptOnly.toJson(),
-          'editSchedule': editedSchedule.toJson(),
-          'editConfigTask': editConfig,
-          'removeConfigTask': removeConfig,
-          'removeMissing': removeMissing,
-          'disabled': disabled.toJson(),
-          'reEnabled': reEnabled.toJson(),
-          'generated': generatedShape,
-          'remainingIds': [
-            for (final CronTask t in service.tasks) t.id,
-          ],
+          'added': projections['added'],
+          'duplicate': projections['duplicate'],
+          'invalid': projections['invalid'],
+          'editPromptOnly': projections['editPromptOnly'],
+          'editSchedule': projections['editSchedule'],
+          'editConfigTask': projections['editConfigTask'],
+          'removeConfigTask': projections['removeConfigTask'],
+          'removeMissing': projections['removeMissing'],
+          'disabled': projections['disabled'],
+          'reEnabled': projections['reEnabled'],
+          'removeDyn': projections['removeDyn'],
+          'generated': projections['generated'],
+          // 只剩自动生成 id 的那一条；id 值含毫秒与随机后缀，不入 fixture。
+          'remainingCount': service.tasks.length,
+          'remainingAllGenerated': service.tasks.every(
+            (CronTask t) => RegExp(r'^task-[0-9a-z]+-[0-9a-z]{4}$')
+                .hasMatch(t.id),
+          ),
         },
       },
       <String, Object?>{
         'scenario': 'persistence',
         'label': '持久化只写显式字段表：内部缓存不落盘，删任务后表里不再有它',
+        'input': persistInput,
         'expect': <String, Object?>{
-          'savedTaskKeys': storage.loadTasks().dynamicTasks.isEmpty
+          'savedTaskKeys': persistStorage.loadTasks().dynamicTasks.isEmpty
               ? <String>[]
-              : storage
+              : persistStorage
                   .loadTasks()
                   .dynamicTasks
                   .map((Map<String, Object?> t) => t.keys.toList()..sort())
                   .toList(),
-          'savedCount': storage.loadTasks().dynamicTasks.length,
+          'savedCount': persistStorage.loadTasks().dynamicTasks.length,
         },
       },
     ],
@@ -586,17 +831,22 @@ Future<Map<String, Object?>> _cronHistory() async {
     slot: now,
     firedAt: now,
   );
+  // 记录是**可变对象**：序列化结果必须在对应时刻取快照，否则后面的 finish 会
+  // 把「已推进」的状态写进本该是「刚交付」的投影（本项目已踩过一次）。
+  final String recordId = committed.id;
+  final Map<String, Object?> recordJson = Map<String, Object?>.of(committed.toJson());
 
   // finish 推进 + 摘要截断（300 字符上限）。
   final CronRunRecord? finished = service.finishRun(
-    committed.id,
+    recordId,
     ok: true,
     excerpt: 'x' * 350,
   );
-  final CronRunRecord? failed = service.finishRun(
-    committed.id,
-    ok: false,
-  );
+  final String? finishedStatus = finished?.status;
+  final int? excerptLength = finished?.excerpt?.length;
+  // 同一条记录再推进一次：状态被覆盖为 failed（摘要留上一次的值）。
+  final CronRunRecord? failed = service.finishRun(recordId, ok: false);
+  final String? failedStatus = failed?.status;
   final CronRunRecord? missing = service.finishRun('run-999-zz', ok: true);
 
   // limit 退化：缺省 / 非法 → 100，超过上限 → 500。
@@ -611,25 +861,35 @@ Future<Map<String, Object?>> _cronHistory() async {
   return <String, Object?>{
     'name': 'cron-history',
     'kind': 'cron-history',
+    'localZone': 'UTC',
     'now': formatCronInstant(now),
     'cases': <Map<String, Object?>>[
       <String, Object?>{
         'scenario': 'ledger',
         'label': '账本：seq 预分配与归还保持连续、记录序列化、finish 推进与摘要截断、未知 id 返回空',
+        'input': <String, Object?>{
+          'taskId': 't1',
+          'slot': formatCronInstant(now),
+          'firedAt': formatCronInstant(now),
+          'excerptLength': 350,
+          'missingRecordId': 'run-999-zz',
+          'listLimits': <int?>[null, 0, -5, 3, 9999],
+        },
         'expect': <String, Object?>{
           'firstSeqReleased': first.seq,
           'secondSeq': second.seq,
-          'recordIdShape': RegExp(r'^run-\d+-[0-9a-z]+$').hasMatch(committed.id),
-          'record': committed.toJson(),
-          'finishedStatus': finished?.status,
-          'excerptLength': finished?.excerpt?.length,
-          'failedStatusOnMissing': failed == null ? 'null' : failed.status,
+          'recordIdShape': RegExp(r'^run-\d+-[0-9a-z]+$').hasMatch(recordId),
+          'record': recordJson,
+          'finishedStatus': finishedStatus,
+          'excerptLength': excerptLength,
+          'failedStatusOnMissing': failedStatus ?? 'null',
           'missingRecord': missing == null ? 'null' : 'record',
         },
       },
       <String, Object?>{
         'scenario': 'limit',
         'label': 'list 的 limit 退化：缺省与非法 → 100，超过上限 → 500',
+        'input': <String, Object?>{'listLimits': <int?>[null, 0, -5, 3, 9999]},
         'expect': <String, Object?>{'caps': caps},
       },
     ],
@@ -643,45 +903,50 @@ Future<Map<String, Object?>> _cronMessage() async {
   final DateTime now = DateTime.parse('2026-03-09T10:00:00Z');
   final DateTime startedAt = DateTime.parse('2026-03-09T08:00:00Z');
 
-  final Map<String, Object?> daily = _rulesView(
-    _task(
+  // 视图用例的任务描述（进 fixture）；投影键与 fixture 的 expect 键同名。
+  final Map<String, Map<String, Object?>> viewSpecs =
+      <String, Map<String, Object?>>{
+    'daily': _taskSpec(
       id: 't-daily',
       daily: '07:00',
       sessionId: 's9',
       lastRunAt: '2026-03-08T07:00:00Z',
     ),
-    now,
-    startedAt,
-  );
-  final Map<String, Object?> fired = _rulesView(
-    _task(id: 't-at', at: '2026-03-09T09:00:00Z', firedAt: '2026-03-09T09:00:00Z'),
-    now,
-    startedAt,
-  );
-  final Map<String, Object?> cronView = _rulesView(
-    _task(id: 't-cron', cron: '*/15 * * * *'),
-    now,
-    startedAt,
-  );
+    'firedAt': _taskSpec(
+      id: 't-at',
+      at: '2026-03-09T09:00:00Z',
+      firedAt: '2026-03-09T09:00:00Z',
+    ),
+    'cron': _taskSpec(id: 't-cron', cron: '*/15 * * * *'),
+  };
+  final Map<String, Object?> views = <String, Object?>{
+    for (final MapEntry<String, Map<String, Object?>> entry
+        in viewSpecs.entries)
+      entry.key: _rulesView(_taskFromSpec(entry.value), now, startedAt),
+  };
 
   return <String, Object?>{
     'name': 'cron-message',
     'kind': 'cron-message',
+    'localZone': 'UTC',
     'now': formatCronInstant(now),
     'startedAt': formatCronInstant(startedAt),
     'cases': <Map<String, Object?>>[
       <String, Object?>{
         'scenario': 'view',
         'label': '模型可见视图：schedule 四选一、daily 已消费顺延一天、at 已消费无下次',
-        'expect': <String, Object?>{
-          'daily': daily,
-          'firedAt': fired,
-          'cron': cronView,
-        },
+        'input': <String, Object?>{'views': viewSpecs},
+        'expect': views,
       },
       <String, Object?>{
         'scenario': 'framing',
         'label': '触发 framing 逐行固定（防注入设计，不许改写）',
+        'input': <String, Object?>{
+          'id': 't-1',
+          'prompt': '把昨天的会议纪要发出去',
+          'slot': '2026-03-09T09:00:00Z',
+          'firedAt': '2026-03-09T09:00:01Z',
+        },
         'expect': <String, Object?>{
           'framing': renderTaskMessage(
             id: 't-1',
@@ -697,9 +962,30 @@ Future<Map<String, Object?>> _cronMessage() async {
 
 // ───────────────────────────── 运行时与工具 ─────────────────────────────
 
+/// 手动 tick 用的「不响的」选项：定时器间隔拉到极大，导出期间不会自己触发。
+///
+/// 注：本导出器**不**在构造后立刻 `dispose()`——dispose 会把 `_disposed` 置位，
+/// 之后的 `tick()` 会在循环开头直接返回（见 cron_runtime.dart）。只靠极大间隔
+/// 保证定时器安静，用完再 `dispose()`。
+CronRuntimeOptions _quietOptions(
+  DateTime Function() clock,
+  void Function(String) warn,
+) =>
+    CronRuntimeOptions(
+      clock: clock,
+      onWarning: warn,
+      tickSeconds: 3600,
+      firstTickDelay: const Duration(days: 1),
+    );
+
 /// kind = cron-runtime / cron-tools：tick 扫描、投递被拒不消费时段、工具结果形状。
+///
+/// 到期任务一律用 `at`（已过的一次性时刻）构造：`every` 的锚点是服务装配时刻，
+/// 用 `every` 造「应当立刻到期」的任务会因未到间隔而空跑（踩过一次，
+/// 导出的期望值全是 0，测试看着过、实际什么都没验）。
 Future<Map<String, Object?>> _cronRuntime() async {
   final DateTime now = DateTime.parse('2026-03-09T10:00:00Z');
+  const String past = '2026-03-09T09:00:00Z';
   final List<String> warnings = <String>[];
   final List<String> delivered = <String>[];
 
@@ -713,7 +999,7 @@ Future<Map<String, Object?>> _cronRuntime() async {
   refusing.addDynamicTask(<String, Object?>{
     'id': 'refused',
     'prompt': '被拒',
-    'every': 600,
+    'at': past,
   });
   bool accept = false;
   final CronRuntime refusingRuntime = CronRuntime(
@@ -722,27 +1008,33 @@ Future<Map<String, Object?>> _cronRuntime() async {
       delivered.add('${task.id}:$recordId');
       return accept;
     },
-    options: CronRuntimeOptions(
-      clock: () => now,
-      onWarning: warnings.add,
-      tickSeconds: 1,
-      firstTickDelay: Duration.zero,
-    ),
+    options: _quietOptions(() => now, warnings.add),
   );
-  refusingRuntime.dispose(); // 只用手动 tick，不留定时器
   await refusingRuntime.tick();
-  final Object? afterRefuse = <String, Object?>{
+  final Map<String, Object?> afterRefuse = <String, Object?>{
     'lastRunAt': formatCronInstant(refusing.findTask('refused')?.lastRunAt),
+    'firedAt': formatCronInstant(refusing.findTask('refused')?.firedAt),
     'historyCount': refusing.listHistory().length,
+    'deliverAttempts': delivered.length,
     'warned': warnings.length,
   };
   accept = true;
   await refusingRuntime.tick();
   final Map<String, Object?> afterAccept = <String, Object?>{
     'lastRunAt': formatCronInstant(refusing.findTask('refused')?.lastRunAt),
+    'firedAt': formatCronInstant(refusing.findTask('refused')?.firedAt),
     'historyCount': refusing.listHistory().length,
-    'deliveredCount': delivered.length,
+    'deliverAttempts': delivered.length,
+    'warned': warnings.length,
   };
+  // at 任务消费后不再触发（第三次 tick 断言幂等，不重复交付）。
+  await refusingRuntime.tick();
+  final Map<String, Object?> afterConsumed = <String, Object?>{
+    'historyCount': refusing.listHistory().length,
+    'deliverAttempts': delivered.length,
+    'warned': warnings.length,
+  };
+  refusingRuntime.dispose();
 
   // 投递抛错：不消费时段，走告警。
   final MemoryCronStorage throwStorage = MemoryCronStorage();
@@ -751,63 +1043,96 @@ Future<Map<String, Object?>> _cronRuntime() async {
     clock: () => now,
     onWarning: warnings.add,
   );
-  throwing.addDynamicTask(<String, Object?>{'id': 'boom', 'prompt': '抛错', 'every': 600});
+  throwing.addDynamicTask(<String, Object?>{'id': 'boom', 'prompt': '抛错', 'at': past});
   final CronRuntime throwingRuntime = CronRuntime(
     service: throwing,
     deliver: (String recordId, String framing, CronTask task) async =>
         throw StateError('host down'),
-    options: CronRuntimeOptions(
-      clock: () => now,
-      onWarning: warnings.add,
-      tickSeconds: 1,
-      firstTickDelay: Duration.zero,
-    ),
+    options: _quietOptions(() => now, warnings.add),
   );
-  throwingRuntime.dispose();
   await throwingRuntime.tick();
   final Map<String, Object?> afterThrow = <String, Object?>{
-    'lastRunAt': formatCronIntervalTask(throwing),
+    'lastRunAt': formatCronInstant(throwing.findTask('boom')?.lastRunAt),
+    'firedAt': formatCronInstant(throwing.findTask('boom')?.firedAt),
     'historyCount': throwing.listHistory().length,
+    'warned': warnings.length,
   };
+  throwingRuntime.dispose();
 
   // 单任务故障隔离：一个任务抛错不阻断其他任务。
   final MemoryCronStorage isolated = MemoryCronStorage();
   final CronService isolateService = CronService(
     storage: isolated,
     clock: () => now,
+    onWarning: warnings.add,
   );
-  isolateService.addDynamicTask(<String, Object?>{'id': 'ok-1', 'prompt': '好的', 'every': 600});
+  isolateService.addDynamicTask(<String, Object?>{'id': 'ok-1', 'prompt': '好的', 'at': past});
   final CronRuntime isolateRuntime = CronRuntime(
     service: isolateService,
     deliver: (String recordId, String framing, CronTask task) async {
       if (task.id == 'bad') throw StateError('boom');
       return true;
     },
-    options: CronRuntimeOptions(
-      clock: () => now,
-      onWarning: warnings.add,
-      tickSeconds: 1,
-      firstTickDelay: Duration.zero,
-    ),
+    options: _quietOptions(() => now, warnings.add),
   );
-  isolateRuntime.dispose();
-  isolateService.addDynamicTask(<String, Object?>{'id': 'bad', 'prompt': '坏的', 'every': 600});
+  isolateService.addDynamicTask(<String, Object?>{'id': 'bad', 'prompt': '坏的', 'at': past});
   await isolateRuntime.tick();
   final Map<String, Object?> isolation = <String, Object?>{
     'goodDelivered': isolateService.listHistory().length,
+    'warned': warnings.length,
+  };
+  isolateRuntime.dispose();
+
+  // 运行时场景的输入（进 fixture）：任务描述与交付端口行为。
+  final Map<String, Object?> deliveryInput = <String, Object?>{
+    'at': past,
+    'scenarios': <Map<String, Object?>>[
+      <String, Object?>{
+        'name': 'refuse',
+        'tasks': <Map<String, Object?>>[
+          <String, Object?>{'id': 'refused', 'prompt': '被拒', 'at': past},
+        ],
+        'deliver': 'refuse-then-accept',
+        'ticks': 3,
+        'watchTask': 'refused',
+      },
+      <String, Object?>{
+        'name': 'throw',
+        'tasks': <Map<String, Object?>>[
+          <String, Object?>{'id': 'boom', 'prompt': '抛错', 'at': past},
+        ],
+        'deliver': 'throw',
+        'ticks': 1,
+        'watchTask': 'boom',
+      },
+      <String, Object?>{
+        'name': 'isolate',
+        'tasks': <Map<String, Object?>>[
+          <String, Object?>{'id': 'ok-1', 'prompt': '好的', 'at': past},
+          <String, Object?>{'id': 'bad', 'prompt': '坏的', 'at': past},
+        ],
+        'deliver': 'throw-on:bad',
+        'ticks': 1,
+        'watchTask': null,
+      },
+    ],
   };
 
   return <String, Object?>{
     'name': 'cron-runtime',
     'kind': 'cron-runtime',
+    'localZone': 'UTC',
     'now': formatCronInstant(now),
     'cases': <Map<String, Object?>>[
       <String, Object?>{
         'scenario': 'delivery',
-        'label': '投递：返回假不消费时段且下 tick 重试、抛错不消费、交付成功才写运行戳与历史',
+        'label': '投递：返回假不消费时段且下 tick 重试、抛错不消费、交付成功才写运行戳与历史、'
+            'at 消费后不再触发、单任务故障隔离',
+        'input': deliveryInput,
         'expect': <String, Object?>{
           'afterRefuse': afterRefuse,
           'afterAccept': afterAccept,
+          'afterConsumed': afterConsumed,
           'afterThrow': afterThrow,
           'isolated': isolation,
         },
@@ -815,6 +1140,14 @@ Future<Map<String, Object?>> _cronRuntime() async {
       <String, Object?>{
         'scenario': 'run-now',
         'label': 'runTaskNow：任务不存在 → not-found；投递不可用 → delivery-unavailable',
+        'input': <String, Object?>{
+          'missingId': 'ghost',
+          'unavailableTask': <String, Object?>{
+            'id': 'busy',
+            'prompt': '忙',
+            'every': 600,
+          },
+        },
         'expect': <String, Object?>{
           'missing': await _guard(() async {
             final CronService empty = CronService(
@@ -824,18 +1157,15 @@ Future<Map<String, Object?>> _cronRuntime() async {
             final CronRuntime runtime = CronRuntime(
               service: empty,
               deliver: (String id, String framing, CronTask task) async => true,
-              options: CronRuntimeOptions(
-                clock: () => now,
-                tickSeconds: 1,
-                firstTickDelay: Duration.zero,
-              ),
+              options: _quietOptions(() => now, (String _) {}),
             );
-            runtime.dispose();
             try {
               await runtime.runTaskNow('ghost');
               return 'ran';
             } on CronException catch (error) {
               return error.code;
+            } finally {
+              runtime.dispose();
             }
           }),
           'unavailable': await _guard(() async {
@@ -851,18 +1181,15 @@ Future<Map<String, Object?>> _cronRuntime() async {
             final CronRuntime runtime = CronRuntime(
               service: busy,
               deliver: (String id, String framing, CronTask task) async => false,
-              options: CronRuntimeOptions(
-                clock: () => now,
-                tickSeconds: 1,
-                firstTickDelay: Duration.zero,
-              ),
+              options: _quietOptions(() => now, (String _) {}),
             );
-            runtime.dispose();
             try {
               await runtime.runTaskNow('busy');
               return 'ran';
             } on CronException catch (error) {
               return error.code;
+            } finally {
+              runtime.dispose();
             }
           }),
         },
@@ -870,9 +1197,6 @@ Future<Map<String, Object?>> _cronRuntime() async {
     ],
   };
 }
-
-String? formatCronIntervalTask(CronService service) =>
-    formatCronInstant(service.findTask('boom')?.lastRunAt);
 
 /// kind = cron-tools：五个工具的结果形状与错误码。
 Future<Map<String, Object?>> _cronTools() async {
@@ -890,16 +1214,30 @@ Future<Map<String, Object?>> _cronTools() async {
   service.commitFire(ref: ref, taskId: 'list-me', slot: now, firedAt: now);
   service.finishRun(ref.id, ok: true, excerpt: '已完成');
 
+  const Map<String, Object?> toolsInput = <String, Object?>{
+    'task': <String, Object?>{
+      'id': 'list-me',
+      'prompt': '列出来',
+      'every': 600,
+      'sessionId': 's1',
+    },
+    'fire': <String, Object?>{'slot': '2026-03-09T10:00:00.000Z', 'firedAt': '2026-03-09T10:00:00.000Z'},
+    'finish': <String, Object?>{'ok': true, 'excerpt': '已完成'},
+    'historyLimit': 5,
+  };
+
   return <String, Object?>{
     'name': 'cron-tools',
     'kind': 'cron-tools',
+    'localZone': 'UTC',
     'now': formatCronInstant(now),
     'cases': <Map<String, Object?>>[
       <String, Object?>{
         'scenario': 'list',
         'label': 'cron_list：任务视图数组（规范 JSON 文本）',
+        'input': toolsInput,
         'expect': <String, Object?>{
-          'json': jsonEncode(<Map<String, Object?>>[
+          'json': _canonicalJson(<Map<String, Object?>>[
             for (final CronTaskView view in service.listTasks()) view.toJson(),
           ]),
         },
@@ -907,8 +1245,9 @@ Future<Map<String, Object?>> _cronTools() async {
       <String, Object?>{
         'scenario': 'history',
         'label': 'cron_history：最新在前的记录数组，含状态与摘要',
+        'input': toolsInput,
         'expect': <String, Object?>{
-          'json': jsonEncode(<Map<String, Object?>>[
+          'json': _canonicalJson(<Map<String, Object?>>[
             for (final CronRunRecord record in service.listHistory(limit: 5))
               record.toJson(),
           ]),
