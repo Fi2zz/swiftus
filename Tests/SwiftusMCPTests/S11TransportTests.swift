@@ -195,7 +195,7 @@ struct S11TransportTests {
         try await transport.connect()
         _ = await mcpAwaitEndpoint(transport)
         registry.closeStream(path: "/sse")
-        await mcpSettle()
+        await mcpAwait { events.finished }
         let received = events
         let failure = received.failures.first as? McpException
         #expect(failure?.code == McpException.Codes.sseClosed)
@@ -325,7 +325,8 @@ struct S11TransportTests {
         let transport = StdioTransport(command: "/bin/echo", args: ["已退出"])
         let events = mcpCollect(transport)
         try await transport.connect()
-        await mcpSettle(rounds: 60)
+        // 等「故障已投递且流已关闭」，而不是等固定时长。
+        await mcpAwait { events.finished }
         let failure = events.failures.first as? McpException
         #expect(failure?.code == McpException.Codes.serverExited)
         #expect(events.finished, "子进程退出后消息流应关闭")
@@ -503,6 +504,23 @@ final class McpCollected: @unchecked Sendable {
 @ContextTreeActor
 func mcpSettle(rounds: Int = 40) async {
     for _ in 0..<rounds {
+        await Task.yield()
+        try? await Task.sleep(for: .milliseconds(2))
+    }
+}
+
+/// **有界轮询直到条件成立**，不等固定轮数。
+///
+/// `mcpSettle(rounds:)` 是「等这么久再看」，条件没成立就只当没发生——本仓在
+/// `stdio 传输：子进程退出` 上踩过：全量并发时 `/bin/echo` 退出 + 收口比 60 轮
+/// 慢，用例偶发红。凡是「等某件事发生」都要走这个形状（坑 #8 同一纪律）。
+@ContextTreeActor
+func mcpAwait(
+    rounds: Int = 300,
+    _ condition: @escaping @ContextTreeActor () -> Bool
+) async {
+    for _ in 0..<rounds {
+        if condition() { return }
         await Task.yield()
         try? await Task.sleep(for: .milliseconds(2))
     }

@@ -1,0 +1,15 @@
+# conatus 侧锚点：swiftus 的 golden fixtures 由哪个 conatus 提交导出。
+#
+# 为什么要有这个文件：AGENTS.md 的演进纪律是「swiftus 版本以 Dart 侧 git tag 为锚
+# （如『对齐 conatus v0.17.0』），不追 master 漂移」，但**光有 tag 不够**——本仓的
+# fixtures 实际是从 tag 之后的某个具体提交导出的（语义变更可能先落在 master 上）。
+# CI 用这个 sha 重跑导出器并 diff，没有它就只能对着 tag 跑、报一堆与 tag 无关的差异。
+#
+# 怎么更新：语义同步完成、Dart 侧与 Swift 侧 fixtures 都过测之后，
+#   1. cd <conatus checkout> && git pull
+#   2. bash tool/export_fixtures/export.sh
+#   3. git -C <swiftus> diff --stat spec/fixtures   # 有差异才继续
+#   4. 把下面的 sha 换成新的 HEAD
+#
+# 格式：一个 40 位十六进制提交号，单独一行（允许行尾注释以 # 开头）。
+4cb60310522f609376cabb321c14195f63962567

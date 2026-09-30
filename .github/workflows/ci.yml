@@ -1,0 +1,61 @@
+name: CI
+
+# 门禁对应方案书 §四的波次出口：fixtures 全绿 + swift-testing 覆盖语义关键点 +
+# release 零警告。本仓**没有本地历史**（只有单人开发 + 本地手动跑），这个 workflow
+# 是第一道机器可判的门禁；逻辑都放在 tool/ci/*.sh，CI 与本地跑同一份命令，
+# 避免「CI 过了但本地复现不了」。
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── 主验证：debug / release 构建与测试 + Demo 冒烟 ──
+  verify:
+    name: 构建与测试（macOS）
+    # S11 的 stdio 端到端用例在 `#if os(macOS)` 里且依赖 `swiftc` 编译回声 server，
+    # URLProtocol 桩也是 macOS 侧注入点——Windows / Linux runner 跑不了这套。
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 记录工具链（strict concurrency 的诊断随 Xcode 收紧，失败时据此判断）
+        run: |
+          swift --version
+          xcodebuild -version
+
+      - name: 主验证
+        run: bash tool/ci/verify.sh
+
+  # ── iOS 可编译性 + 平台专属域核验 ──
+  ios:
+    name: iOS 编译与符号核验
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: iOS 编译 13 个 target + 符号表核验
+        run: bash tool/ci/ios.sh
+
+  # ── fixtures 漂移核验（两端同步纪律的门禁）──
+  fixtures:
+    name: fixtures 与 conatus 同步
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: 3.6
+
+      - name: 从 CONATUS_PIN 钉住的提交重跑导出器并比对
+        run: bash tool/ci/fixtures.sh

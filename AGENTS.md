@@ -25,17 +25,23 @@
 - 语言/工具链：Swift 6（`swift-tools-version: 6.0`，当前实测 Swift 6.3.3），**Swift 6 strict concurrency** 语境下开发；
 - 包管理：Swift Package Manager 单仓库多 target，无 `Package.resolved`（尚未引入外部依赖）；
 - 平台：`Package.swift` 声明 **macOS 13 / iOS 16** floor（2026-09-27 抬升：并发 API / AsyncBytes / Clock 突破工具链默认值，详见方案书 §5.6）；
+- CI：`.github/workflows/ci.yml`，三个 job——`verify`（debug/release 零警告 + 测试各双跑 + Demo 冒烟）、`ios`（13 个 target 编译 + 符号表核验平台专属域缺席）、`fixtures`（从 `tool/export_fixtures/CONATUS_PIN` 钉住的 conatus 提交重跑导出器并 diff）。**逻辑都在 `tool/ci/*.sh`**，CI 与本地跑同一份命令；改验证方式只改脚本，不用同步两处；
 - 许可证：MIT。
 
 常用命令：
 
 ```bash
-swift build                  # debug 构建（当前骨架秒级完成）
+bash tool/ci/verify.sh       # 主验证：debug/release 零警告 + 测试各双跑 + Demo 冒烟
+bash tool/ci/ios.sh          # iOS 13 个 target 编译 + 符号表核验
+bash tool/ci/fixtures.sh     # 从 CONATUS_PIN 重跑导出器并 diff（两端同步纪律的门禁）
+swift build                  # debug 构建
 swift build -c release       # release 构建
-swift test                   # 尚无测试 target；测试落地后用 swift-testing（@Test + 参数化）
+swift test                   # swift-testing（@Test + 参数化）
 ```
 
-波次出口门槛（方案书 §四）：fixtures 全绿 + swift-testing 单元覆盖语义关键点 + `swift build -c release` **零警告**。CI（GitHub Actions）由维护者稍后配置；落地前 debug + release 双跑 fixtures 以本地手动执行代替（release 优化下时序会变，必须双跑，见坑 #8）。
+CI 的三个 job 调的就是上面三个脚本——**门禁与本地验证是同一份命令**，改一处即两处生效。
+
+波次出口门槛（方案书 §四）：fixtures 全绿 + swift-testing 单元覆盖语义关键点 + `swift build -c release` **零警告**。这三项由 `tool/ci/verify.sh` 一次跑完（CI 与本地同源）。fixtures 的一致性另有 `tool/ci/fixtures.sh` 守着：它从 `tool/export_fixtures/CONATUS_PIN` 钉住的 conatus 提交重跑全部导出器并 diff——把「两端同步过测才算变更完成」从口头纪律变成机器门禁。release 测试**必须双跑**（坑 #8）。
 
 ## 仓库布局与模块划分
 
@@ -130,9 +136,12 @@ docs/.handoffs/             # 两份权威文档（中文，移植的全部决�
 7. dispose 期间再 provide：actor 模型下消息交错顺序不同，M1 的 actor 方案必须用重入用例逐条验；
 8. release 构建差异：时序会变，CI 前以本地 debug + release 双跑 fixtures 代替；测试里等「投递到达」用有界轮询，别用固定 `Task.sleep`（release + 全量并发下会踩空）；
 9. **协议扩展里给默认实现的成员，覆写会被静默忽略**：`Tool.schema` 原先只在扩展里定义，`any Tool` 存在值上的成员访问走 witness table、静态派发到扩展那份实现，于是 MCP 适配器「透传服务端 `inputSchema`」的覆写完全不生效（模型看到空 schema）——**fixtures 直接调具体类型测不出来，是 Demo 端到端先发现的**。凡是要被覆写且调用方可能拿存在值的成员，一律声明为协议要求（回归用例 `S11TransportTests.schemaOverrideSurvivesExistential`）；
-10. **阻塞调用绝不能留在协作线程池**：`FileHandle.availableData` 与 `Process.waitUntilExit` 写在 `Task` 里会占满线程，让同进程的 `Task.sleep` / URLSession 回调一起饿死（表现为「别的用例莫名挂住」）；两者都放专用 `DispatchQueue`，再用 `Task` 回隔离域；
+10. **阻塞调用绝不能留在协作线程池**：`FileHandle.availableData` 写在 `Task` 里会占满线程，让同进程的 `Task.sleep` / URLSession 回调一起饿死（表现为「别的用例莫名挂住」）；要放专用 `DispatchQueue`，再 `Task` 回隔离域。（子进程退出检测的同款陷阱见坑 #15，那里给出了更好的解法）；
 11. **Dart 里 future 失败时若还没有错误处理器会立刻终止整个导出器**：导出会触发故障的用例必须**先**建好 `_guard` 守护再触发（`_guard` 返回的 future 要先创建、后 await）；
-12. **验证导出器自身也要用边界轮询**：`Task { try await … }` 到真正发出之间没有同步点，紧接着的 `close()` / `fail()` 可能跑在它前面，待办表扑空就永久悬挂；用「有界轮询等某个方法真的被发出」而不是固定 sleep。
+12. **验证导出器自身也要用边界轮询**：`Task { try await … }` 到真正发出之间没有同步点，紧接着的 `close()` / `fail()` 可能跑在它前面，待办表扑空就永久悬挂；用「有界轮询等某个方法真的被发出」而不是固定 sleep；
+13. **bash 会把紧跟变量名的多字节字符吸进变量名**：`"$config（…"` 里的 `（` 会被当成变量名的一部分，报 `config（: unbound variable`——在中文文案里极容易踩。凡是变量后紧跟非 ASCII 字符，一律写 `${config}`；
+14. **`set -o pipefail` + `| head` = 随机猝死**：`head` 提前关管道，上游收到 SIGPIPE(141)，pipefail 判成失败。CI 脚本里要「先取前 N 行」就用 `sed -n '1,Np'`，别用 `| head`；
+15. **子进程退出检测别用「另起线程 `waitUntilExit`」**：那要占一个线程阻塞，而 `DispatchQueue.global` 的 worker 在全量并发下会被别的阻塞读挤占，表现为「进程早退了却等不到事件」的偶发红。`Process.terminationHandler` 由 Foundation 在内部队列回调，不占本进程线程。
 
 ## 文档与沟通约定
 

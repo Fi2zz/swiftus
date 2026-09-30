@@ -27,7 +27,6 @@ public final class StdioTransport: McpTransport {
     private var process: Process?
     private var stdoutTask: Task<Void, Never>?
     private var stderrTask: Task<Void, Never>?
-    private var waiterTask: Task<Void, Never>?
 
     public init(
         command: String,
@@ -92,31 +91,31 @@ public final class StdioTransport: McpTransport {
             self?.diagnostics.log(line)
         }
         // 子进程退出 → 消息流收到 server-exited 并关闭。
-        // `waitUntilExit` 是阻塞调用，放到后台线程上等（不能占住协作线程池）。
-        waiterTask = Task { [weak self] in
-            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-                DispatchQueue.global(qos: .utility).async {
-                    process.waitUntilExit()
-                    continuation.resume()
-                }
+        //
+        // 用 `terminationHandler` 而不是「另起线程 `waitUntilExit`」：后者要占住一个
+        // 线程阻塞等进程，而 `DispatchQueue.global` 的 worker 在全量并发下会被本仓
+        // 其他阻塞读（管道 `availableData`）挤占，utility 队列迟迟排不上——表现为
+        // 「子进程早退了，测试却等不到 server-exited」的偶发红（本仓在 CI 前夜踩到，
+        // debug 复现一次、release 复现一次）。`terminationHandler` 由 Foundation
+        // 在内部队列上回调，不占本进程的线程。
+        process.terminationHandler = { [weak self] finished in
+            Task { @ContextTreeActor in
+                guard let self else { return }
+                self.sink.connected = false
+                self.sink.emitFailure(McpException(
+                    McpException.Codes.serverExited,
+                    "MCP server \"\(self.command)\" 已退出（状态 \(finished.terminationStatus)）"
+                ))
+                self.sink.finish()
             }
-            guard let self, !Task.isCancelled else { return }
-            self.sink.connected = false
-            self.sink.emitFailure(McpException(
-                McpException.Codes.serverExited,
-                "MCP server \"\(self.command)\" 已退出（状态 \(process.terminationStatus)）"
-            ))
-            self.sink.finish()
         }
     }
 
     public func disconnect() async {
         stdoutTask?.cancel()
         stderrTask?.cancel()
-        waiterTask?.cancel()
         stdoutTask = nil
         stderrTask = nil
-        waiterTask = nil
         if let process, process.isRunning {
             process.terminate()
         }
