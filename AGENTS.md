@@ -6,7 +6,7 @@
 
 **swiftus** 是 [conatus](https://github.com/Fi2zz/conatus)（Dart 实现的「时空可组合性」编程范式框架：可逆效应 + 反应式共效应）的 Swift 移植版，命名延续 cordis（TS）→ conatus（Dart）→ swiftus（Swift）的拉丁谱系。移植动机是摆脱 Dart 运行时单一依赖，使框架成为语言中立的资产。
 
-**当前状态（2026-09-30）**：**移植范围全部收口（W1–W3 完成）**——W1 的 core / credentials 最小集 / llm / prompt / tool / skill 之上，Compaction / Schedule / session 持久化层 / Agent 全特性 / 任务中心全部就位；W3 的凭据全量 + SigV4（S12 v1.1 / S15）、Foundation 全部 14 个能力域（S18 fs+shell、S19 database/timer/time-context/logger/loader）、Cron（S9）、联网搜索与抓取（S20）、MCP 客户端（S11）均已落地。离线 Demo `swift run swiftus-demo` 跑通「提问 → 工具调用 → 回填 → 收口」并**多跑一轮 MCP server 工具调用**（脚本化模型 + 进程内 MCP server，无需 Key / 无需网络），swift-testing 340 例 69 套件 debug+release 双绿、release 零警告。外部依赖：Yams（仅 SwiftusSkill）+ 系统 CryptoKit（SigV4）。平台 floor macOS 13 / iOS 16（§5.6 抬升；iOS 侧已逐 target 实测可编译：**shell 与 MCP 的 stdio 领域整体只在 macOS 存在**，iOS 表面不暴露）。没有 CI。
+**当前状态（2026-09-30）**：**移植范围全部收口（W1–W3 完成）**——W1 的 core / credentials 最小集 / llm / prompt / tool / skill 之上，Compaction / Schedule / session 持久化层 / Agent 全特性 / 任务中心全部就位；W3 的凭据全量 + SigV4（S12 v1.1 / S15）、Foundation 全部 14 个能力域（S18 fs+shell、S19 database/timer/time-context/logger/loader）、Cron（S9）、联网搜索与抓取（S20）、MCP 客户端（S11）均已落地。离线 Demo `swift run swiftus-demo` 跑通「提问 → 工具调用 → 回填 → 收口」，并**逐段演示**会话持久化（S4）/ 任务中心（S17）/ 提醒（S8）/ 定时任务交付（S9）/ 联网搜索（S20）/ MCP server 工具（S11）——一条会话贯穿全程，全部离线（脚本化模型 + 进程内 MCP server + 临时目录，无需 Key / 无需网络）。swift-testing 345 例 71 套件 debug+release 双绿、release 零警告。外部依赖：Yams（仅 SwiftusSkill）+ 系统 CryptoKit（SigV4）。平台 floor macOS 13 / iOS 16（§5.6 抬升；iOS 侧已逐 target 实测可编译：**shell 与 MCP 的 stdio 领域整体只在 macOS 存在**，iOS 表面不暴露）。没有 CI。
 
 移植范围（已拍板）：
 

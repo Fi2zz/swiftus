@@ -46,12 +46,16 @@ let package = Package(
         ]),
         .target(name: "SwiftusDemo", dependencies: [
             "SwiftusCore", "SwiftusFoundation", "SwiftusLLM", "SwiftusMCP", "SwiftusSkill",
+            "SwiftusCron", "SwiftusSchedule", "SwiftusSearch", "SwiftusTasks",
         ]),
         .executableTarget(name: "SwiftusRunner", dependencies: ["SwiftusDemo"]),
         .testTarget(name: "SwiftusCoreTests", dependencies: ["SwiftusCore"]),
         .testTarget(name: "SwiftusCredentialsTests", dependencies: ["SwiftusCredentials"]),
         .testTarget(name: "SwiftusLLMTests", dependencies: ["SwiftusLLM", "SwiftusCredentials"]),
-        .testTarget(name: "SwiftusFoundationTests", dependencies: ["SwiftusFoundation"]),
+        // 跨域接线用例（会话 + 任务 + 提醒 + cron）需要后三个 target。
+        .testTarget(name: "SwiftusFoundationTests", dependencies: [
+            "SwiftusFoundation", "SwiftusCron", "SwiftusSchedule", "SwiftusTasks",
+        ]),
         .testTarget(name: "SwiftusCompactionTests", dependencies: ["SwiftusCompaction", "SwiftusFoundation"]),
         .testTarget(name: "SwiftusScheduleTests", dependencies: ["SwiftusSchedule", "SwiftusFoundation"]),
         .testTarget(name: "SwiftusCronTests", dependencies: ["SwiftusCron", "SwiftusFoundation"]),
