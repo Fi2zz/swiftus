@@ -1,0 +1,217 @@
+{
+  "name": "mcp-content",
+  "kind": "mcp-content",
+  "cases": [
+    {
+      "scenario": "result",
+      "label": "tools/call 结果 → ToolResult：内容文本、占位、isError 失败码、结构化 value",
+      "input": [
+        {
+          "label": "纯文本块按换行分隔",
+          "json": {
+            "content": [
+              {
+                "type": "text",
+                "text": "第一段"
+              },
+              {
+                "type": "text",
+                "text": "第二段"
+              }
+            ]
+          }
+        },
+        {
+          "label": "非文本块给占位（有 MIME 用 MIME，没有用类型名）",
+          "json": {
+            "content": [
+              {
+                "type": "image",
+                "data": "base64…",
+                "mimeType": "image/png"
+              },
+              {
+                "type": "resource"
+              },
+              {
+                "type": "text",
+                "text": "尾段"
+              }
+            ]
+          }
+        },
+        {
+          "label": "空文本块被跳过；type 缺失退 text",
+          "json": {
+            "content": [
+              {
+                "type": "text",
+                "text": ""
+              },
+              {
+                "text": "没有 type 字段"
+              }
+            ]
+          }
+        },
+        {
+          "label": "isError → 失败：文本既作内容也作错误消息",
+          "json": {
+            "isError": true,
+            "content": [
+              {
+                "type": "text",
+                "text": "工具执行失败"
+              }
+            ]
+          }
+        },
+        {
+          "label": "成功：结构化结果进 value",
+          "json": {
+            "structuredContent": {
+              "rows": 3
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "ok"
+              }
+            ]
+          }
+        },
+        {
+          "label": "isError 为 false（非 true）→ 成功",
+          "json": {
+            "isError": false,
+            "content": [
+              {
+                "type": "text",
+                "text": "fine"
+              }
+            ]
+          }
+        },
+        {
+          "label": "空对象 → 空文本、空 value",
+          "json": {}
+        },
+        {
+          "label": "content 不是列表 → 空内容",
+          "json": {
+            "content": "不是列表"
+          }
+        }
+      ],
+      "expect": [
+        {
+          "text": "第一段\n第二段",
+          "failed": false,
+          "code": null,
+          "value": null
+        },
+        {
+          "text": "[image/png]\n[resource]\n尾段",
+          "failed": false,
+          "code": null,
+          "value": null
+        },
+        {
+          "text": "没有 type 字段",
+          "failed": false,
+          "code": null,
+          "value": null
+        },
+        {
+          "text": "工具执行失败",
+          "failed": true,
+          "code": "MCP_TOOL_ERROR",
+          "value": null
+        },
+        {
+          "text": "ok",
+          "failed": false,
+          "code": null,
+          "value": {
+            "rows": 3
+          }
+        },
+        {
+          "text": "fine",
+          "failed": false,
+          "code": null,
+          "value": null
+        },
+        {
+          "text": "",
+          "failed": false,
+          "code": null,
+          "value": null
+        },
+        {
+          "text": "",
+          "failed": false,
+          "code": null,
+          "value": null
+        }
+      ]
+    },
+    {
+      "scenario": "describe",
+      "label": "人可读文本：多行拼接、空块跳过、占位说明",
+      "input": [
+        {
+          "label": "多个文本块换行拼接",
+          "blocks": [
+            {
+              "type": "text",
+              "text": "一"
+            },
+            {
+              "type": "text",
+              "text": "二"
+            }
+          ]
+        },
+        {
+          "label": "图片给 [mimeType] 占位",
+          "blocks": [
+            {
+              "type": "image",
+              "data": "x",
+              "mimeType": "image/jpeg"
+            }
+          ]
+        },
+        {
+          "label": "无 MIME 时退回类型名",
+          "blocks": [
+            {
+              "type": "resource"
+            }
+          ]
+        },
+        {
+          "label": "空列表 → 空串",
+          "blocks": []
+        },
+        {
+          "label": "只有空文本块 → 空串",
+          "blocks": [
+            {
+              "type": "text",
+              "text": ""
+            }
+          ]
+        }
+      ],
+      "expect": [
+        "一\n二",
+        "[image/jpeg]",
+        "[resource]",
+        "",
+        ""
+      ]
+    }
+  ]
+}

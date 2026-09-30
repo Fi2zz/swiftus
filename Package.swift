@@ -45,7 +45,7 @@ let package = Package(
             "SwiftusSchedule", "SwiftusCron", "SwiftusAgent", "SwiftusTasks",
         ]),
         .target(name: "SwiftusDemo", dependencies: [
-            "SwiftusCore", "SwiftusFoundation", "SwiftusLLM", "SwiftusSkill",
+            "SwiftusCore", "SwiftusFoundation", "SwiftusLLM", "SwiftusMCP", "SwiftusSkill",
         ]),
         .executableTarget(name: "SwiftusRunner", dependencies: ["SwiftusDemo"]),
         .testTarget(name: "SwiftusCoreTests", dependencies: ["SwiftusCore"]),
@@ -60,6 +60,11 @@ let package = Package(
         ]),
         .testTarget(name: "SwiftusAgentTests", dependencies: ["SwiftusAgent", "SwiftusCompaction", "SwiftusFoundation", "SwiftusLLM"]),
         .testTarget(name: "SwiftusSkillTests", dependencies: ["SwiftusSkill", "SwiftusFoundation"]),
+        .testTarget(name: "SwiftusMCPTests", dependencies: [
+            "SwiftusMCP", "SwiftusCore", "SwiftusCredentials", "SwiftusFoundation",
+            // 回声 MCP server 是被 stdio 传输拉起的**子进程脚本**（顶层代码），
+            // 不能编进测试 target。
+        ], exclude: ["EchoMcpServer.swift"]),
         .testTarget(name: "SwiftusTasksTests", dependencies: [
             "SwiftusTasks", "SwiftusAgent", "SwiftusFoundation", "SwiftusSchedule",
         ]),

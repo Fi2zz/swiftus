@@ -1,0 +1,320 @@
+{
+  "name": "mcp-protocol",
+  "kind": "mcp-protocol",
+  "cases": [
+    {
+      "scenario": "message",
+      "label": "消息三态（method+id / method / 无 method）、jsonrpc 固定 2.0、畸形字段退缺省",
+      "input": [
+        {
+          "label": "请求",
+          "json": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/list",
+            "params": {
+              "cursor": "c"
+            }
+          }
+        },
+        {
+          "label": "通知（无 id，单向）",
+          "json": {
+            "jsonrpc": "2.0",
+            "method": "notifications/initialized"
+          }
+        },
+        {
+          "label": "成功响应（无 method）",
+          "json": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": {
+              "tools": []
+            }
+          }
+        },
+        {
+          "label": "失败响应",
+          "json": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "error": {
+              "code": -32601,
+              "message": "方法不存在",
+              "data": {
+                "hint": "x"
+              }
+            }
+          }
+        },
+        {
+          "label": "字符串 id 的请求",
+          "json": {
+            "jsonrpc": "2.0",
+            "id": "abc",
+            "method": "ping"
+          }
+        },
+        {
+          "label": "服务端主动请求（有 id 有 method）",
+          "json": {
+            "jsonrpc": "2.0",
+            "id": 9,
+            "method": "roots/list"
+          }
+        },
+        {
+          "label": "畸形：method 不是字符串 → 该字段为空（连通知都不是）",
+          "json": {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "method": 42
+          }
+        },
+        {
+          "label": "畸形：params 不是对象 → params 为空",
+          "json": {
+            "jsonrpc": "2.0",
+            "id": 4,
+            "method": "x",
+            "params": "不是对象"
+          }
+        },
+        {
+          "label": "畸形：error 不是对象 → 无 error（按成功响应序列化）",
+          "json": {
+            "jsonrpc": "2.0",
+            "id": 5,
+            "error": "炸了"
+          }
+        },
+        {
+          "label": "畸形：错误对象缺 code 与 message → 退 0 与空串",
+          "json": {
+            "jsonrpc": "2.0",
+            "id": 6,
+            "error": {}
+          }
+        }
+      ],
+      "expect": [
+        {
+          "request": true,
+          "notification": false,
+          "response": false,
+          "toJson": {
+            "jsonrpc": "2.0",
+            "method": "tools/list",
+            "params": {
+              "cursor": "c"
+            },
+            "id": 1
+          }
+        },
+        {
+          "request": false,
+          "notification": true,
+          "response": false,
+          "toJson": {
+            "jsonrpc": "2.0",
+            "method": "notifications/initialized"
+          }
+        },
+        {
+          "request": false,
+          "notification": false,
+          "response": true,
+          "toJson": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": {
+              "tools": []
+            }
+          }
+        },
+        {
+          "request": false,
+          "notification": false,
+          "response": true,
+          "toJson": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "error": {
+              "code": -32601,
+              "message": "方法不存在",
+              "data": {
+                "hint": "x"
+              }
+            }
+          }
+        },
+        {
+          "request": true,
+          "notification": false,
+          "response": false,
+          "toJson": {
+            "jsonrpc": "2.0",
+            "method": "ping",
+            "id": "abc"
+          }
+        },
+        {
+          "request": true,
+          "notification": false,
+          "response": false,
+          "toJson": {
+            "jsonrpc": "2.0",
+            "method": "roots/list",
+            "id": 9
+          }
+        },
+        {
+          "request": false,
+          "notification": false,
+          "response": true,
+          "toJson": {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "result": null
+          }
+        },
+        {
+          "request": true,
+          "notification": false,
+          "response": false,
+          "toJson": {
+            "jsonrpc": "2.0",
+            "method": "x",
+            "id": 4
+          }
+        },
+        {
+          "request": false,
+          "notification": false,
+          "response": true,
+          "toJson": {
+            "jsonrpc": "2.0",
+            "id": 5,
+            "result": null
+          }
+        },
+        {
+          "request": false,
+          "notification": false,
+          "response": true,
+          "toJson": {
+            "jsonrpc": "2.0",
+            "id": 6,
+            "error": {
+              "code": 0,
+              "message": ""
+            }
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "handshake",
+      "label": "握手结果：标准形态 / 顶层宽容形态 / 缺字段退缺省（协议版本照收不误）",
+      "input": [
+        {
+          "label": "标准形态（服务端版本不同也照收不误）",
+          "json": {
+            "protocolVersion": "2024-11-05",
+            "capabilities": {
+              "tools": {}
+            },
+            "serverInfo": {
+              "name": "fake",
+              "version": "9.9"
+            }
+          }
+        },
+        {
+          "label": "顶层宽容形态（name/version 在顶层）",
+          "json": {
+            "protocolVersion": "2025-06-18",
+            "name": "flat",
+            "version": "1.0",
+            "instructions": "怎么用"
+          }
+        },
+        {
+          "label": "缺 protocolVersion → 退回本客户端声明的版本",
+          "json": {
+            "serverInfo": {
+              "name": "n"
+            }
+          }
+        },
+        {
+          "label": "缺 capabilities → 空对象",
+          "json": {
+            "protocolVersion": "2025-06-18"
+          }
+        },
+        {
+          "label": "字段类型不符 → 退缺省",
+          "json": {
+            "protocolVersion": 42,
+            "serverInfo": "不是对象",
+            "capabilities": "不是对象"
+          }
+        }
+      ],
+      "expect": [
+        {
+          "protocolVersion": "2024-11-05",
+          "name": "fake",
+          "version": "9.9",
+          "instructions": null,
+          "capabilities": {
+            "tools": {}
+          }
+        },
+        {
+          "protocolVersion": "2025-06-18",
+          "name": "flat",
+          "version": "1.0",
+          "instructions": "怎么用",
+          "capabilities": {}
+        },
+        {
+          "protocolVersion": "2025-06-18",
+          "name": "n",
+          "version": null,
+          "instructions": null,
+          "capabilities": {}
+        },
+        {
+          "protocolVersion": "2025-06-18",
+          "name": null,
+          "version": null,
+          "instructions": null,
+          "capabilities": {}
+        },
+        {
+          "protocolVersion": "2025-06-18",
+          "name": null,
+          "version": null,
+          "instructions": null,
+          "capabilities": {}
+        }
+      ]
+    },
+    {
+      "scenario": "const",
+      "label": "本客户端声明的协议版本、工具名拼接与异常文案",
+      "input": {
+        "server": "fs",
+        "tool": "read_file"
+      },
+      "expect": {
+        "protocolVersion": "2025-06-18",
+        "toolName": "fs__read_file",
+        "exception": "McpException(timeout): 示例"
+      }
+    }
+  ]
+}

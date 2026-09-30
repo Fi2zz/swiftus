@@ -1,0 +1,264 @@
+{
+  "name": "mcp-risk",
+  "kind": "mcp-risk",
+  "cases": [
+    {
+      "scenario": "risk",
+      "label": "风险映射顺序：非标准 riskLevel → destructiveHint → readOnlyHint → 默认 medium",
+      "input": [
+        {
+          "label": "什么都没声明 → medium（默认需审批）",
+          "json": {
+            "name": "t"
+          }
+        },
+        {
+          "label": "readOnlyHint → low",
+          "json": {
+            "name": "t",
+            "annotations": {
+              "readOnlyHint": true
+            }
+          }
+        },
+        {
+          "label": "destructiveHint → high",
+          "json": {
+            "name": "t",
+            "annotations": {
+              "destructiveHint": true
+            }
+          }
+        },
+        {
+          "label": "两个注解同时给 → destructive 优先",
+          "json": {
+            "name": "t",
+            "annotations": {
+              "readOnlyHint": true,
+              "destructiveHint": true
+            }
+          }
+        },
+        {
+          "label": "注解为 false / 非布尔 → 落回默认",
+          "json": {
+            "name": "t",
+            "annotations": {
+              "readOnlyHint": false,
+              "destructiveHint": "yes"
+            }
+          }
+        },
+        {
+          "label": "annotations 不是对象 → 空注解",
+          "json": {
+            "name": "t",
+            "annotations": "不是对象"
+          }
+        },
+        {
+          "label": "riskLevel=readonly → low",
+          "json": {
+            "name": "t",
+            "riskLevel": "readonly"
+          }
+        },
+        {
+          "label": "riskLevel=read → low",
+          "json": {
+            "name": "t",
+            "riskLevel": "read"
+          }
+        },
+        {
+          "label": "riskLevel=READ（大小写不敏感）→ low",
+          "json": {
+            "name": "t",
+            "riskLevel": "READ"
+          }
+        },
+        {
+          "label": "riskLevel=write → medium",
+          "json": {
+            "name": "t",
+            "riskLevel": "write"
+          }
+        },
+        {
+          "label": "riskLevel=mutating → medium",
+          "json": {
+            "name": "t",
+            "riskLevel": "mutating"
+          }
+        },
+        {
+          "label": "riskLevel=destructive → high",
+          "json": {
+            "name": "t",
+            "riskLevel": "destructive"
+          }
+        },
+        {
+          "label": "riskLevel=admin → high",
+          "json": {
+            "name": "t",
+            "riskLevel": "admin"
+          }
+        },
+        {
+          "label": "未知 riskLevel 标签 → 落回注解",
+          "json": {
+            "name": "t",
+            "riskLevel": "weird",
+            "annotations": {
+              "readOnlyHint": true
+            }
+          }
+        },
+        {
+          "label": "riskLevel 优先于注解（destructive 标签 + readOnlyHint）",
+          "json": {
+            "name": "t",
+            "riskLevel": "destructive",
+            "annotations": {
+              "readOnlyHint": true
+            }
+          }
+        }
+      ],
+      "expect": [
+        "medium",
+        "low",
+        "high",
+        "high",
+        "medium",
+        "medium",
+        "low",
+        "low",
+        "low",
+        "medium",
+        "medium",
+        "high",
+        "high",
+        "low",
+        "high"
+      ]
+    },
+    {
+      "scenario": "schema",
+      "label": "工具适配：名字 server__tool、描述退级、分组 mcp:<server>、参数声明留空、入参透传",
+      "input": {
+        "server": "fs",
+        "tools": [
+          {
+            "label": "透传服务端 inputSchema",
+            "json": {
+              "name": "read_file",
+              "description": "读文件",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "path": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "path"
+                ]
+              }
+            }
+          },
+          {
+            "label": "只有 title → 描述退 title",
+            "json": {
+              "name": "titled",
+              "title": "只有标题"
+            }
+          },
+          {
+            "label": "什么都没有 → 描述退工具名；schema 退空对象形态",
+            "json": {
+              "name": "bare"
+            }
+          },
+          {
+            "label": "name 缺失（服务端异常形态）→ 空串名",
+            "json": {
+              "description": "无名的工具"
+            }
+          }
+        ]
+      },
+      "expect": [
+        {
+          "name": "fs__read_file",
+          "description": "读文件",
+          "risk": "medium",
+          "group": "mcp:fs",
+          "params": [],
+          "schema": {
+            "name": "fs__read_file",
+            "description": "读文件",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "path"
+              ]
+            }
+          }
+        },
+        {
+          "name": "fs__titled",
+          "description": "只有标题",
+          "risk": "medium",
+          "group": "mcp:fs",
+          "params": [],
+          "schema": {
+            "name": "fs__titled",
+            "description": "只有标题",
+            "parameters": {
+              "type": "object",
+              "properties": {}
+            }
+          }
+        },
+        {
+          "name": "fs__bare",
+          "description": "bare",
+          "risk": "medium",
+          "group": "mcp:fs",
+          "params": [],
+          "schema": {
+            "name": "fs__bare",
+            "description": "bare",
+            "parameters": {
+              "type": "object",
+              "properties": {}
+            }
+          }
+        },
+        {
+          "name": "fs__",
+          "description": "无名的工具",
+          "risk": "medium",
+          "group": "mcp:fs",
+          "params": [],
+          "schema": {
+            "name": "fs__",
+            "description": "无名的工具",
+            "parameters": {
+              "type": "object",
+              "properties": {}
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

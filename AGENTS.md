@@ -6,7 +6,7 @@
 
 **swiftus** 是 [conatus](https://github.com/Fi2zz/conatus)（Dart 实现的「时空可组合性」编程范式框架：可逆效应 + 反应式共效应）的 Swift 移植版，命名延续 cordis（TS）→ conatus（Dart）→ swiftus（Swift）的拉丁谱系。移植动机是摆脱 Dart 运行时单一依赖，使框架成为语言中立的资产。
 
-**当前状态（2026-09-29）**：**W2 已收口**——W1 的 core / credentials 最小集 / llm / prompt / tool / skill 之上，Compaction / Schedule / session 持久化层 / Agent 全特性 / 任务中心全部就位，离线 Demo `swift run swiftus-demo` 跑通「提问 → 工具调用 → 回填 → 收口」（脚本化模型，无需 Key），swift-testing 317 例 67 套件 debug+release 双绿、release 零警告。外部依赖：Yams（仅 SwiftusSkill）+ 系统 CryptoKit（SigV4）。平台 floor macOS 13 / iOS 16（§5.6 抬升；iOS 侧 2026-09-29 已逐 target 实测可编译：**shell 领域整体只在 macOS 存在**，iOS 表面不暴露）。没有 CI。W3 进行中：凭据全量 + SigV4（S12 v1.1 / S15）、Foundation 全部 14 个能力域（S18 fs+shell、S19 database/timer/time-context/logger/loader）与 Cron（S9）、联网搜索与抓取（S20）已收口，余下 MCP(S11)。
+**当前状态（2026-09-30）**：**移植范围全部收口（W1–W3 完成）**——W1 的 core / credentials 最小集 / llm / prompt / tool / skill 之上，Compaction / Schedule / session 持久化层 / Agent 全特性 / 任务中心全部就位；W3 的凭据全量 + SigV4（S12 v1.1 / S15）、Foundation 全部 14 个能力域（S18 fs+shell、S19 database/timer/time-context/logger/loader）、Cron（S9）、联网搜索与抓取（S20）、MCP 客户端（S11）均已落地。离线 Demo `swift run swiftus-demo` 跑通「提问 → 工具调用 → 回填 → 收口」并**多跑一轮 MCP server 工具调用**（脚本化模型 + 进程内 MCP server，无需 Key / 无需网络），swift-testing 340 例 69 套件 debug+release 双绿、release 零警告。外部依赖：Yams（仅 SwiftusSkill）+ 系统 CryptoKit（SigV4）。平台 floor macOS 13 / iOS 16（§5.6 抬升；iOS 侧已逐 target 实测可编译：**shell 与 MCP 的 stdio 领域整体只在 macOS 存在**，iOS 表面不暴露）。没有 CI。
 
 移植范围（已拍板）：
 
@@ -98,7 +98,7 @@ docs/.handoffs/             # 两份权威文档（中文，移植的全部决�
 
 规格沉淀为**滚动式**：每个领域动工前，该领域对应规格文档与 fixtures 必须就绪。规格编号滚动（S1 起；S11 留给 MCP，S20 是 W3 中途新增的 Search 域），要点见方案书 §3.1，包括：S1 效应语义（LIFO 撤销/幂等/迟到登记/重入收敛 maxRounds=100/循环依赖检测）、S2 上下文树、S3/S4 Session 事件 JSONL 格式与 fork/replay、S5 工具管线（schema 白名单投影、失败码全集、超时优先级）、S6 Prompt 装配、S7 压缩切点、S8 调度语义（DST 缺口拒绝、重叠取较早）、S9 Cron 语义（含「无时区信息的 `at` 按 UTC 解释」「预分配记录标识前先加载账本」两条有意偏离）、S10 LLM 协议、S11 MCP 客户端、S12 凭据、S13 Memory 召回（中文二元组打分）、S14 Skill catalog、S15 SigV4、S16 Agent Loop 产品化、S17 任务中心、S18 Foundation 能力域（fs / shell）、S19 Foundation 能力域（database / timer / time-context / logger / loader）、S20 联网搜索与抓取。
 
-- 规格文档与 fixtures 均放本仓 `spec/` 目录（规格 `spec/*.md`、用例 `spec/fixtures/s*/`）——已就位：S1–S10/S12–S20（S11 留空给 MCP；fixtures 覆盖 s4/s7/s8/s9/s12/s13/s15/s16/s17/s18/s19/s20）；
+- 规格文档与 fixtures 均放本仓 `spec/` 目录（规格 `spec/*.md`、用例 `spec/fixtures/s*/`）——**S1–S20 全部就位**（fixtures 覆盖 s4/s7/s8/s9/s11/s12/s13/s15/s16/s17/s18/s19/s20；S11 的传输层不进 fixtures，由 Swift 侧单元测试 + Demo 承担，理由见 `tool/export_fixtures/README.md` 的 S11 段）；
 - fixtures 由 Dart 脚本导出器（本仓 `tool/export_fixtures/export_s*.dart`）在本地 conatus checkout 上导出并校验，**fixtures 以 Dart 侧行为为准绳导出，不是手写**；
 - 每条规格至少 3 个用例；发现语义漏译时补一条 fixture 而非补丁代码；
 - **fixtures 不锁语言运行时序**：事件循环投递时机、广播流订阅时机之类的表面差异不进 fixture，改由 Swift 侧单元测试断言（见 HANDOFF「已采的坑」）。
@@ -128,7 +128,11 @@ docs/.handoffs/             # 两份权威文档（中文，移植的全部决�
 5. JSON 数字精度：Dart `num` 不区分 int/double（见上 JSONValue 双形态）；`JSONSerialization` 不接受顶层标量且抛 ObjC 异常（JSONL 拼字节写、字符串转义自己实现），`JSONValue.jsonData()` 用 `.sortedKeys`（与 Dart 插入序不同，文本比对要两端同序）；
 6. 中文二元组打分（S13）：Swift String 按 grapheme cluster 实现，与 Dart UTF-16 语义不同，fixtures 必须有中文用例；Dart 的 `weekday` 是 1=周一、Foundation 是 1=周日，cron 星期换算是**减一**不是 `% 7`；`ISO8601DateFormatter` 要求带偏移，无时区串要自己配 GMT 的 `DateFormatter`；
 7. dispose 期间再 provide：actor 模型下消息交错顺序不同，M1 的 actor 方案必须用重入用例逐条验；
-8. release 构建差异：时序会变，CI 前以本地 debug + release 双跑 fixtures 代替；测试里等「投递到达」用有界轮询，别用固定 `Task.sleep`（release + 全量并发下会踩空）。
+8. release 构建差异：时序会变，CI 前以本地 debug + release 双跑 fixtures 代替；测试里等「投递到达」用有界轮询，别用固定 `Task.sleep`（release + 全量并发下会踩空）；
+9. **协议扩展里给默认实现的成员，覆写会被静默忽略**：`Tool.schema` 原先只在扩展里定义，`any Tool` 存在值上的成员访问走 witness table、静态派发到扩展那份实现，于是 MCP 适配器「透传服务端 `inputSchema`」的覆写完全不生效（模型看到空 schema）——**fixtures 直接调具体类型测不出来，是 Demo 端到端先发现的**。凡是要被覆写且调用方可能拿存在值的成员，一律声明为协议要求（回归用例 `S11TransportTests.schemaOverrideSurvivesExistential`）；
+10. **阻塞调用绝不能留在协作线程池**：`FileHandle.availableData` 与 `Process.waitUntilExit` 写在 `Task` 里会占满线程，让同进程的 `Task.sleep` / URLSession 回调一起饿死（表现为「别的用例莫名挂住」）；两者都放专用 `DispatchQueue`，再用 `Task` 回隔离域；
+11. **Dart 里 future 失败时若还没有错误处理器会立刻终止整个导出器**：导出会触发故障的用例必须**先**建好 `_guard` 守护再触发（`_guard` 返回的 future 要先创建、后 await）；
+12. **验证导出器自身也要用边界轮询**：`Task { try await … }` 到真正发出之间没有同步点，紧接着的 `close()` / `fail()` 可能跑在它前面，待办表扑空就永久悬挂；用「有界轮询等某个方法真的被发出」而不是固定 sleep。
 
 ## 文档与沟通约定
 

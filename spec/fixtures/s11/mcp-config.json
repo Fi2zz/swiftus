@@ -1,0 +1,164 @@
+{
+  "name": "mcp-config",
+  "kind": "mcp-config",
+  "cases": [
+    {
+      "scenario": "validate",
+      "label": "配置构造期校验：name 非空、stdio 需 command、http/sse 需 url（空串视为缺）",
+      "input": [
+        {
+          "label": "stdio + command",
+          "input": {
+            "name": "fs",
+            "type": "stdio",
+            "command": "npx"
+          }
+        },
+        {
+          "label": "stdio 缺 command",
+          "input": {
+            "name": "fs",
+            "type": "stdio"
+          }
+        },
+        {
+          "label": "stdio command 为空串（视为缺）",
+          "input": {
+            "name": "fs",
+            "type": "stdio",
+            "command": ""
+          }
+        },
+        {
+          "label": "http + url",
+          "input": {
+            "name": "r",
+            "type": "http",
+            "url": "https://mcp.test/mcp",
+            "headers": {
+              "Authorization": "Bearer x"
+            }
+          }
+        },
+        {
+          "label": "http 缺 url",
+          "input": {
+            "name": "r",
+            "type": "http"
+          }
+        },
+        {
+          "label": "sse + url",
+          "input": {
+            "name": "r",
+            "type": "sse",
+            "url": "https://mcp.test/sse"
+          }
+        },
+        {
+          "label": "sse url 为空串（视为缺）",
+          "input": {
+            "name": "r",
+            "type": "sse",
+            "url": ""
+          }
+        },
+        {
+          "label": "名为空串",
+          "input": {
+            "name": "",
+            "type": "stdio",
+            "command": "npx"
+          }
+        }
+      ],
+      "expect": [
+        {
+          "name": "fs",
+          "type": "stdio",
+          "command": "npx",
+          "args": [],
+          "env": {},
+          "url": null,
+          "headers": {}
+        },
+        {
+          "invalid": {
+            "name": "command",
+            "message": "stdio 传输需要 command"
+          }
+        },
+        {
+          "invalid": {
+            "name": "command",
+            "message": "stdio 传输需要 command"
+          }
+        },
+        {
+          "name": "r",
+          "type": "http",
+          "command": null,
+          "args": [],
+          "env": {},
+          "url": "https://mcp.test/mcp",
+          "headers": {
+            "Authorization": "Bearer x"
+          }
+        },
+        {
+          "invalid": {
+            "name": "url",
+            "message": "http 传输需要 url"
+          }
+        },
+        {
+          "name": "r",
+          "type": "sse",
+          "command": null,
+          "args": [],
+          "env": {},
+          "url": "https://mcp.test/sse",
+          "headers": {}
+        },
+        {
+          "invalid": {
+            "name": "url",
+            "message": "sse 传输需要 url"
+          }
+        },
+        {
+          "invalid": {
+            "name": "name",
+            "message": "MCP server 名不能为空"
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "placeholders",
+      "label": "`${KEY}` 占位符：能解析的替换、解析不到的（无服务/无键）原样保留",
+      "input": {
+        "values": {
+          "header": "Bearer ${REMOTE_TOKEN}",
+          "env": "${REMOTE_TOKEN}=${MISSING_KEY}",
+          "plain": "没有占位符",
+          "multi": "${REMOTE_TOKEN}/${REMOTE_TOKEN}"
+        },
+        "credentials": {
+          "REMOTE_TOKEN": "tok-1"
+        }
+      },
+      "expect": {
+        "withCredentials": {
+          "header": "Bearer tok-1",
+          "env": "tok-1=${MISSING_KEY}",
+          "plain": "没有占位符",
+          "multi": "tok-1/tok-1"
+        },
+        "withoutCredentials": {
+          "header": "Bearer ${REMOTE_TOKEN}"
+        }
+      }
+    }
+  ]
+}

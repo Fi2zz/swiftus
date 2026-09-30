@@ -28,6 +28,14 @@ public protocol Tool: AnyObject {
     /// 参数声明；默认无参数。
     var params: [ParamSpec] { get }
 
+    /// 面向模型的白名单投影：只含 name / description / parameters（规格 S5 §2）。
+    ///
+    /// **必须声明为协议要求**（而不是只在扩展里给默认实现）：`any Tool` 存在值
+    /// 上的成员访问走 witness table，只在扩展里定义的成员会被静态派发到扩展那份
+    /// 实现——于是「MCP 工具透传服务端 `inputSchema`」这类覆写会被悄悄忽略
+    /// （S11 落地时踩过：Demo 端到端才发现，fixtures 直接调具体类型所以没抓到）。
+    var schema: JSONValue { get }
+
     /// 执行一次调用。
     func call(_ context: ToolContext) async throws -> ToolResult
 }

@@ -80,6 +80,14 @@ S20（联网搜索与抓取）另有一组专用归一化：
 - **用到 URL 桩的 kind 必须走单条串行用例**：桩注册表是进程级单例而 swift-testing 并发跑用例；用 `NSLock` 串行会在协作线程池上死锁（持锁线程占满 → URLSession 回调拿不到线程 → 全部挂起），端点又必须与 fixture 逐字一致（没法换主机隔离），故只能把三个 kind 合进一条 `@Test` 顺序跑；
 - **桩按 host+port+path 分桶**（不只 authority）：S20 的 fixture 端点都挂在同一探测主机上。
 
+S11（MCP 客户端）另有一组专用归一化：
+
+- **本域无时间语义**（无墙钟、无时区），故不钉 TZ（与 S9 不同），导出器也不做时区自检；
+- **传输层（stdio / http / sse）不进 fixtures**：stdio 要真子进程、http/sse 要 HTTP 桩，两者都是语言相关的注入点——端到端行为改由 Swift 侧单元测试（URLProtocol 桩 / 真子进程）与 Demo 承担。fixtures 只锁协议词汇、SSE 解析、内容投影、风险映射、客户端生命周期与注册表生命周期；
+- **抹掉来源侧的 `toString` 形态**（导出器 `_normalize`）：枚举拼进消息的 `McpTransportType.http 传输需要 url` 归一为 `http 传输需要 url`（锁「哪个类型缺哪个字段」，不是 Dart 的枚举名）；异常 `toString` 嵌进断连消息的 `McpException(server-exited): …` 归一为 `mcp-error(server-exited): …`（锁「断连原因整段透传」，不是 Dart 的异常类名）。**唯一例外**是 `const` 用例里的 `McpException(timeout): 示例`——那是纯格式规则、歧义为零，Swift 侧照原样对齐；
+- **导出会触发断连的用例必须先建守护**（`_guard` 的 future 在故障**之前**创建）：Dart 里 future 失败时若还没有错误处理器，会立刻升级成未处理异常并终止整个导出器——本项目踩过两次（S17 同款）；
+- **失败用例必须真的失败**：注册表的「装配失败不上账」用例第一版与成功用例共用恒返回成功的假传输，期望值里落下的是 `"attached"`（用例会「以失败的名字通过」）；假传输因此加了 `connectError` 开关。
+
 ## 同步纪律
 
 conatus 侧语义变更（对齐新 tag）时重新导出并提交；Swift 侧与 Dart 侧 fixtures 同步过测才算该变更完成。

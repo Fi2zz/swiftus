@@ -1,0 +1,145 @@
+{
+  "name": "mcp-client",
+  "kind": "mcp-client",
+  "cases": [
+    {
+      "scenario": "happy",
+      "label": "完整链路：握手（服务端版本照收不误）→ 两页工具 → 调用 → 关闭（幂等）",
+      "input": {
+        "serverName": "fs",
+        "initializeResult": {
+          "protocolVersion": "2024-11-05",
+          "capabilities": {},
+          "serverInfo": {
+            "name": "fake",
+            "version": "9.9"
+          }
+        },
+        "pages": [
+          {
+            "tools": [
+              {
+                "name": "read_file",
+                "description": "读",
+                "inputSchema": {
+                  "type": "object"
+                }
+              }
+            ],
+            "nextCursor": "c2"
+          },
+          {
+            "tools": [
+              {
+                "name": "write_file",
+                "riskLevel": "destructive"
+              }
+            ]
+          }
+        ],
+        "callResult": {
+          "content": [
+            {
+              "type": "text",
+              "text": "ok"
+            }
+          ],
+          "structuredContent": {
+            "bytes": 12
+          }
+        }
+      },
+      "expect": {
+        "serverInfo": {
+          "protocolVersion": "2024-11-05",
+          "name": "fake",
+          "version": "9.9"
+        },
+        "ready": true,
+        "tools": [
+          {
+            "name": "read_file",
+            "risk": "medium"
+          },
+          {
+            "name": "write_file",
+            "risk": "high"
+          }
+        ],
+        "callText": "ok",
+        "callFailed": false,
+        "callValue": {
+          "bytes": 12
+        },
+        "sent": [
+          "initialize",
+          "notifications/initialized",
+          "tools/list",
+          "tools/list",
+          "tools/call"
+        ],
+        "readyAfterClose": false,
+        "closedTwice": true
+      }
+    },
+    {
+      "scenario": "errors",
+      "label": "失败收敛：翻页超限 / 协议错误 / result 畸形 / 超时 / 断连 / 关闭",
+      "input": {
+        "loopingCursor": "always-more",
+        "initializeError": {
+          "code": -32601,
+          "message": "方法不存在"
+        },
+        "malformedPage": "不是对象",
+        "timeoutMs": 5,
+        "disconnectCause": {
+          "code": "server-exited",
+          "message": "子进程退出"
+        }
+      },
+      "expect": {
+        "tooManyPages": {
+          "error": {
+            "code": "too-many-pages",
+            "message": "tools/list 翻页超过 20 页仍未结束"
+          }
+        },
+        "protocolError": {
+          "error": {
+            "code": "protocol-error",
+            "message": "-32601: 方法不存在"
+          }
+        },
+        "malformedResult": {
+          "error": {
+            "code": "malformed-result",
+            "message": "响应缺少 result 对象"
+          }
+        },
+        "timeout": {
+          "error": {
+            "code": "timeout",
+            "message": "请求 2 在 5ms 内没有响应"
+          }
+        },
+        "disconnect": {
+          "pending": {
+            "error": {
+              "code": "disconnected",
+              "message": "与服务端 \"dying\" 的连接中断：mcp-error(server-exited): 子进程退出"
+            }
+          },
+          "disconnectSignals": 1,
+          "ready": false
+        },
+        "closed": {
+          "error": {
+            "code": "closed",
+            "message": "与服务端 \"hold\" 的连接中断：客户端已关闭"
+          }
+        }
+      }
+    }
+  ]
+}

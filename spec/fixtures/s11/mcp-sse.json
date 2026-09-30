@@ -1,0 +1,134 @@
+{
+  "name": "mcp-sse",
+  "kind": "mcp-sse",
+  "cases": [
+    {
+      "scenario": "parse",
+      "label": "SSE 解析：多行 data 拼接、空行派发、注释忽略、单空格剥掉、EOF 补派发、跨 chunk 重组",
+      "input": [
+        {
+          "label": "多行 data 用换行拼接，空行派发",
+          "chunks": [
+            "data: 第一行\ndata: 第二行\n\n"
+          ]
+        },
+        {
+          "label": "event / id 字段随事件带出",
+          "chunks": [
+            "event: endpoint\ndata: /messages?session=1\nid: 7\n\n"
+          ]
+        },
+        {
+          "label": "注释行忽略；只有注释的空块不派发",
+          "chunks": [
+            ": 这是注释\ndata: 有效\n\n",
+            ": 只有注释\n\n"
+          ]
+        },
+        {
+          "label": "冒号后恰好一个空格被剥掉，其余保留",
+          "chunks": [
+            "data:  两个空格保留\ndata:只有一个值\n\n"
+          ]
+        },
+        {
+          "label": "无冒号的字段视为空值 → 该事件不派发",
+          "chunks": [
+            "data\nevent: message\n\n"
+          ]
+        },
+        {
+          "label": "跨 chunk 切分：半行、半字段都能重组",
+          "chunks": [
+            "da",
+            "ta: 前半\nda",
+            "ta: 后半\n\n"
+          ]
+        },
+        {
+          "label": "EOF 时未派发的 data 也派发一次",
+          "chunks": [
+            "data: 结尾没有空行"
+          ]
+        },
+        {
+          "label": "多字节字符被 chunk 切断也不乱码",
+          "chunks": [
+            "data: 中文标",
+            "题\n\n"
+          ]
+        },
+        {
+          "label": "多个事件按顺序派发，字段不复用",
+          "chunks": [
+            "event: a\ndata: 第一\n\nevent: b\ndata: 第二\n\n"
+          ]
+        }
+      ],
+      "expect": [
+        [
+          {
+            "event": null,
+            "data": "第一行\n第二行",
+            "id": null
+          }
+        ],
+        [
+          {
+            "event": "endpoint",
+            "data": "/messages?session=1",
+            "id": "7"
+          }
+        ],
+        [
+          {
+            "event": null,
+            "data": "有效",
+            "id": null
+          }
+        ],
+        [
+          {
+            "event": null,
+            "data": " 两个空格保留\n只有一个值",
+            "id": null
+          }
+        ],
+        [],
+        [
+          {
+            "event": null,
+            "data": "前半\n后半",
+            "id": null
+          }
+        ],
+        [
+          {
+            "event": null,
+            "data": "结尾没有空行",
+            "id": null
+          }
+        ],
+        [
+          {
+            "event": null,
+            "data": "中文标题",
+            "id": null
+          }
+        ],
+        [
+          {
+            "event": "a",
+            "data": "第一",
+            "id": null
+          },
+          {
+            "event": "b",
+            "data": "第二",
+            "id": null
+          }
+        ]
+      ]
+    }
+  ]
+}

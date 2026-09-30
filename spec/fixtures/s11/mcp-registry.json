@@ -1,0 +1,89 @@
+{
+  "name": "mcp-registry",
+  "kind": "mcp-registry",
+  "cases": [
+    {
+      "scenario": "lifecycle",
+      "label": "注册表生命周期：装配上账、失败不上账、断连只注销本 server、短别名、重复装配被拒、关闭幂等",
+      "input": {
+        "servers": [
+          "fs",
+          "git",
+          "broken"
+        ]
+      },
+      "expect": {
+        "afterAttach": {
+          "servers": [
+            "fs",
+            "git"
+          ],
+          "tools": [
+            "fs__read_file",
+            "fs__write_file",
+            "git__read_file",
+            "git__write_file"
+          ],
+          "groups": {
+            "fs__read_file": "mcp:fs",
+            "fs__write_file": "mcp:fs",
+            "git__read_file": "mcp:git",
+            "git__write_file": "mcp:git"
+          },
+          "risks": {
+            "fs__read_file": "medium",
+            "fs__write_file": "high",
+            "git__read_file": "medium",
+            "git__write_file": "high"
+          },
+          "fsToolCount": 2,
+          "clientOfMissing": false
+        },
+        "attachFailure": {
+          "error": {
+            "code": "not-connected",
+            "message": "连不上 broken"
+          }
+        },
+        "afterDrop": {
+          "servers": [
+            "git"
+          ],
+          "tools": [
+            "git__read_file",
+            "git__write_file"
+          ]
+        },
+        "afterAlias": {
+          "tools": [
+            "git__read_file",
+            "git__write_file",
+            "read_file"
+          ],
+          "aliasDescription": "git 的 read_file",
+          "aliasGroup": "mcp:git",
+          "aliasRisk": "medium",
+          "aliasSchemaName": "read_file"
+        },
+        "aliasMissing": {
+          "state": "别名 \"nope\" 的目标工具 \"missing__tool\" 未注册"
+        },
+        "aliasClash": {
+          "state": "工具 \"git__read_file\" 已注册"
+        },
+        "duplicate": {
+          "state": "MCP server \"git\" 已装配"
+        },
+        "afterClose": {
+          "servers": [],
+          "tools": []
+        },
+        "contextDispose": {
+          "registeredBefore": 2,
+          "registeredAfter": 0,
+          "secondDisposeFailed": null
+        }
+      }
+    }
+  ]
+}
