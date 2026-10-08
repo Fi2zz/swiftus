@@ -61,9 +61,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # 必须 ≥ conatus(CONATUS_PIN) 的 pubspec 约束 `sdk: ^3.11.0`；本地实测 3.12.x。
+      # 钉 3.6 会让 `dart pub get` 因 SDK 约束直接失败（fixtures job 曾因此 2s 即红）。
       - uses: dart-lang/setup-dart@v1
         with:
-          sdk: 3.6
+          sdk: '3.12'
 
       - name: 从 CONATUS_PIN 钉住的提交重跑导出器并比对
         run: bash tool/ci/fixtures.sh
