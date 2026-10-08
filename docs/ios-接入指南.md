@@ -1,6 +1,6 @@
 # iOS 接入指南
 
-版本对应：**v0.1.0**（W2 收口 + W3 的凭据全量 / SigV4 / Foundation 14 域 + iOS 可编译性）
+版本对应：**v0.1.5**（W1–W3 全部收口：凭据全量 / SigV4 / Foundation 14 域 / Cron / Search / MCP + iOS 可编译性）
 本文里的代码样例**以 iOS SDK 类型检查验证过**（不是伪代码），验证命令见文末。
 
 ## 1. 前置条件
@@ -19,7 +19,7 @@ Xcode → File → **Add Package Dependencies…** → 输入：
 https://github.com/Fi2zz/swiftus.git
 ```
 
-版本规则选 **Up to Next Major**（或 Exact / Range），填 `0.1.0`（tag 为 `v0.1.0`，SwiftPM 两种写法都认）。
+版本规则选 **Up to Next Major**（或 Exact / Range），填 `0.1.5`（tag 为 `v0.1.5`，SwiftPM 两种写法都认）。
 
 ### 2.1 选哪个 product
 
@@ -28,7 +28,7 @@ Xcode 的 Target → General → Frameworks, Libraries → **Add Package Product
 - **`Swiftus`（伞产品）**——一个产品拿到全部模块，最省事；**代价是它包含 `SwiftusSkill`，会连带引入第三方依赖 Yams 及其 C 模块 CYaml**。
 - **按需选**（不想引入任何第三方依赖时选这套）：`SwiftusCore`、`SwiftusFoundation`、`SwiftusCredentials`、`SwiftusLLM`；要 Agent 能力再加 `SwiftusCompaction` + `SwiftusSchedule` + `SwiftusAgent`（Agent 依赖这三者）；要任务中心再加 `SwiftusTasks`；要技能目录才加 `SwiftusSkill`（**只有它会拉 Yams**）。
 
-依赖关系：`Agent → {Core, Foundation, LLM, Compaction, Schedule}`；`Tasks → {Core, Foundation, Agent, Schedule}`。不要选 `SwiftusCron` / `SwiftusSearch` / `SwiftusMCP`——**这三个 target 目前是空声明，尚无实现**。
+依赖关系：`Agent → {Core, Foundation, LLM, Compaction, Schedule}`；`Tasks → {Core, Foundation, Agent, Schedule}`；`Cron / Search → {Core, Foundation}`（Search 另需 Credentials）；`MCP → {Core, Credentials, Foundation}`。这些 target 均已实现，按需选即可（`SwiftusMCP` 的 stdio 传输在 iOS 不可用，http / sse 可用）。
 
 ## 3. 最小可跑样例
 
@@ -206,10 +206,11 @@ try await credentials.update("ARK_API_KEY", "sk-…")    // 先落 Keychain，�
 | Core（上下文树 / 可逆效应 / JSONValue / 脱敏） | ✅ | ✅ |
 | Foundation 14 域中的 fs / database / logger / timer / loader / time-context / session / tools / prompt / memory | ✅（受沙盒约束） | ✅ |
 | Skills（Yams 解析 frontmatter） | ✅（需引入 Yams） | ✅ |
-| Credentials 五来源 + SigV4 | ✅（env 来源在 iOS 无意义） | ✅ |
+| Credentials 五来源 + SigV4 + 可插拔来源端口（S12 §7.5） | ✅（env 来源在 iOS 无意义） | ✅ |
 | LLM / Compaction / Schedule / Agent / Tasks | ✅ | ✅ |
+| Cron / Search | ✅ | ✅ |
+| **MCP** | ✅（stdio 传输不可用；http / sse 可用） | ✅ |
 | **shell（执行命令）** | ❌ 整域不存在 | ✅ |
-| Cron / Search / MCP | ❌ 尚无实现 | ❌ 尚无实现 |
 
 ## 6. 验证样例本身没腐化
 
@@ -218,7 +219,8 @@ try await credentials.update("ARK_API_KEY", "sk-…")    // 先落 Keychain，�
 ```bash
 # 1) 先为 iOS 编译出各模块（产物在 /tmp/iosdd/Build/Products/Debug-iphoneos）
 for s in SwiftusCore SwiftusFoundation SwiftusCredentials SwiftusLLM \
-         SwiftusCompaction SwiftusSchedule SwiftusSkill SwiftusAgent SwiftusTasks Swiftus; do
+         SwiftusCompaction SwiftusSchedule SwiftusSkill SwiftusAgent SwiftusTasks \
+         SwiftusCron SwiftusSearch SwiftusMCP Swiftus; do
   xcodebuild -scheme $s -destination 'generic/platform=iOS' -derivedDataPath /tmp/iosdd build
 done
 
@@ -234,9 +236,9 @@ xcrun -sdk iphoneos swiftc -target arm64-apple-ios16.0 -typecheck -swift-version
   docs/samples/IosIntegrationSample.swift
 ```
 
-## 7. 已知缺口（v0.1.0）
+## 7. 已知缺口
 
-- `SwiftusCron` / `SwiftusSearch` / `SwiftusMCP` 三个 target 为空声明，无实现（对应规格 S9 / S11 未开始）；
 - **无内置 Keychain 凭据来源**，但 S12 §7.5 提供了可插拔端口：实现 `WritableCredentialStore` 即可接入（见 §3 ③），或用文件来源；
-- 无 iOS 端 shell 后端；
-- 无 CI；包的上游仓库也没有 CI 流水线。
+- **iOS 无 shell 后端**（整域只在 macOS）；**MCP 的 stdio 传输**同样只在 macOS（http / sse 在 iOS 可用）；
+- **沙箱约束**：fs / database 只能碰 Application Support / Documents（见 §4 ④）；
+- CI 三 job（verify / ios / fixtures）见仓库 `.github/workflows/ci.yml`。
