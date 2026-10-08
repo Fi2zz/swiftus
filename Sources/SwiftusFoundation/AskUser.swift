@@ -59,6 +59,15 @@ public final class CliAskUser: AskUser {
         }
     }
 
+    /// 当前在途提问数。
+    ///
+    /// 供驱动侧做**有界等待**（等到 `ask` 真的登记后再 `submit`），
+    /// 避免用固定 `Task.sleep` 猜时序——CI / release 负载下会踩空
+    /// （AGENTS 坑 #9/#108）。
+    public var pendingCount: Int {
+        state.withLock { $0.pending.count }
+    }
+
     public func cancel() {
         state.withLock { current -> Void in
             current.cancelled = true

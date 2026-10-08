@@ -54,11 +54,11 @@ struct S16SafetyFixtureTests {
         try askctx.provide(.tools, askRegistry)
         try provideApproval(askctx, approval: askGate)
         let approvedFuture = Task { await askRegistry.call(ToolCall(name: "delete")) }
-        try await Task.sleep(for: .milliseconds(20))
+        try await waitForPending(ask)
         ask.submit("y")
         let approved = await approvedFuture.value
         let deniedFuture = Task { await askRegistry.call(ToolCall(name: "delete")) }
-        try await Task.sleep(for: .milliseconds(20))
+        try await waitForPending(ask)
         ask.submit("n")
         let askDenied = await deniedFuture.value
         let third = cases[2]["expect"]?.objectValue ?? [:]
@@ -126,6 +126,30 @@ struct S16SafetyFixtureTests {
             _ = try await service.load("ghost")
         }
     }
+
+    /// 有界等待「提问已登记」后再投递回答；超时抛错（失败而非挂死）。
+    ///
+    /// 不能用固定 `Task.sleep` 猜时序：CI / release 负载下 `submit` 会早于
+    /// `ask` 的 continuation 登记到达，答案丢失 → 审批超时判拒绝（曾使
+    /// approval-flow 用例在 debug 第二跑偶发红，AGENTS 坑 #9/#108）。
+    private func waitForPending(
+        _ ask: CliAskUser,
+        atLeast count: Int = 1,
+        timeout: Duration = .seconds(5)
+    ) async throws {
+        let deadline = ContinuousClock.now + timeout
+        while ask.pendingCount < count {
+            guard ContinuousClock.now < deadline else {
+                throw ApprovalWaitTimeout(expected: count)
+            }
+            try await Task.sleep(for: .milliseconds(2))
+        }
+    }
+}
+
+/// 等待提问登记超时。
+struct ApprovalWaitTimeout: Error {
+    let expected: Int
 }
 
 /// 固定风险级与路径参数的工具。
