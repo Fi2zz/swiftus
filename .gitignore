@@ -72,6 +72,9 @@ HANDOFF.md
 # 编辑器 / IDE 本地配置：非项目资产，不入库
 .vscode/
 
+# 临时调试产物（如从 GitHub Actions 下载的 job 日志）
+ci-logs/
+
 # 注：本仓已引入外部依赖（Yams），Package.resolved **故意入库**以钉住解析结果、
 # 保证 CI 可复现；勿照抄上面模板里被注释掉的 `# Package.resolved`。
 
