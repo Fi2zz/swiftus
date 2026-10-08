@@ -151,12 +151,46 @@ final class ChatViewModel: ObservableObject {
 
 要点：装配（`init`）与所有业务调用都要跨进 `ContextTreeActor`（`try? await`）；往 MainActor 的属性写回时，**若 `Task` 是在 `@MainActor` 方法里创建的，闭包已继承 MainActor，再写 `await` 反而会告警**。
 
-### ③ 凭据：别硬编码 Key，Keychain 还没实现
+### ③ 凭据：别硬编码 Key，Keychain 走可插拔来源
 
-包内**没有** Keychain 凭据来源（只有 env / memory / file / vault / aws）。生产做法二选一：
+包内**内置**来源只有 env / memory / file / vault / aws；**Keychain 不在其列**，但 S12 §7.5 留了可插拔端口——实现 `WritableCredentialStore`（`load` / `set` 两个方法）交给 `StoreCredentials` 适配器，快照 / 变更推送 / 周期刷新 / 只读策略都由适配器承担：
 
-- **文件来源**（示例用的）：把 `{"ARK_API_KEY": "sk-…"}` 写进 Application Support；
-- **自己实现 `Credentials` 协议**（推荐，走 Keychain）：协议只有 `get` / `update` / `addChangeListener` / `removeChangeListener` / `keys` / `refresh` / `close` 七项，Keychain 版本约 40 行，注入方式与 `FileCredentials` 相同。
+```swift
+import Security
+import SwiftusCredentials
+
+// 只实现 Keychain 的存取本身；S12 语义全在 StoreCredentials 里。
+struct KeychainStore: WritableCredentialStore {
+    let service = "com.example.app"
+    private let queue = DispatchQueue(label: "keychain")   // 阻塞系统调用放专用队列（AGENTS 坑 #10）
+
+    func load() async throws -> [String: Credential] {
+        try await withCheckedThrowingContinuation { cont in
+            queue.async {
+                // kSecClassGenericPassword + kSecAttrService + kSecMatchLimitAll + kSecReturnAttributes，
+                // 逐项再按 account 读 kSecValueData；query 一律带 kSecUseDataProtectionKeychain: true。
+                cont.resume(returning: [:])
+            }
+        }
+    }
+
+    func set(_ credential: Credential) async throws {
+        try await withCheckedThrowingContinuation { cont in
+            queue.async {
+                // SecItemUpdate(kSecClassGenericPassword/Service/Account, [kSecValueData: data])；
+                // errSecItemNotFound 时回退 SecItemAdd 并加 kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly。
+                cont.resume()
+            }
+        }
+    }
+}
+
+let credentials = StoreCredentials(store: KeychainStore())
+try await credentials.refresh()                       // 首次须显式拉取才入快照
+try await credentials.update("ARK_API_KEY", "sk-…")    // 先落 Keychain，再进快照
+```
+
+要点：`kSecUseDataProtectionKeychain` 在 iOS 13+ / macOS 10.15+ 都可用，用了才走 iOS 同款 Data Protection Keychain（macOS 上用 legacy 钥匙串会招来各种访问控制怪象）。不想自己实现也可以继续用**文件来源**：把 `{"ARK_API_KEY": "sk-…"}` 写进 Application Support。
 
 `OpenAiCompatibleProvider` 在构造期解析 Key，之后由**凭据变更推送就地轮换**（不重建 HTTP 客户端），所以 Key 更新无需重建 provider。
 
@@ -203,6 +237,6 @@ xcrun -sdk iphoneos swiftc -target arm64-apple-ios16.0 -typecheck -swift-version
 ## 7. 已知缺口（v0.1.0）
 
 - `SwiftusCron` / `SwiftusSearch` / `SwiftusMCP` 三个 target 为空声明，无实现（对应规格 S9 / S11 未开始）；
-- **无 Keychain 凭据来源**，需自实现或用文件来源；
+- **无内置 Keychain 凭据来源**，但 S12 §7.5 提供了可插拔端口：实现 `WritableCredentialStore` 即可接入（见 §3 ③），或用文件来源；
 - 无 iOS 端 shell 后端；
 - 无 CI；包的上游仓库也没有 CI 流水线。
