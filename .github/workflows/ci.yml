@@ -31,8 +31,16 @@ jobs:
           swift --version
           xcodebuild -version
 
-      - name: 主验证
-        run: bash tool/ci/verify.sh
+      # 按阶段拆成多个 step：哪一步红了不必翻整段日志。
+      # 三个 step 合起来等价于 `verify.sh all`（本地无参跑的那个）。
+      - name: 构建（debug / release 零警告）
+        run: bash tool/ci/verify.sh build
+
+      - name: 测试（debug / release 各双跑）
+        run: bash tool/ci/verify.sh test
+
+      - name: Demo 七段冒烟
+        run: bash tool/ci/verify.sh demo
 
   # ── iOS 可编译性 + 平台专属域核验 ──
   ios:

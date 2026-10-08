@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # 主验证：debug / release 构建与测试 + 离线 Demo 冒烟（CI 与本地跑同一份）。
 #
-# 用法：bash tool/ci/verify.sh
+# 用法：bash tool/ci/verify.sh [build|test|demo|all]
+#   不带参数 = all。CI 按阶段拆成多个 step，这样「哪一步红了」不用翻日志。
 # 约定见 AGENTS.md「验证命令」一节。要点：
 #   * release 零警告是硬门槛（方案书 §四的波次出口）；
 #   * release 测试**必须双跑**（坑 #8：release 优化下时序会变，单跑会偶发绿）；
@@ -102,20 +103,35 @@ demo_smoke() {
   log "Demo 七段冒烟通过 ✓"
 }
 
-log "工具链"
-# 注意：不要写 `swift --version | head -2`——`head` 提前关管道，上游收到 SIGPIPE(141)，
-# 而 `set -o pipefail` 把它判成失败，脚本会随机猝死（本地已复现，CI 上同样会炸）。
-swift_ver="$(swift --version 2>&1 || true)"
-printf '%s\n' "$(printf '%s\n' "$swift_ver" | sed -n '1,2p')"
-printf '%s\n' "$(xcodebuild -version 2>&1 | sed -n '1p' || true)"
+toolchain() {
+  log "工具链"
+  # 注意：不要写 `swift --version | head -2`——`head` 提前关管道，上游收到 SIGPIPE(141)，
+  # 而 `set -o pipefail` 把它判成失败，脚本会随机猝死（本地已复现，CI 上同样会炸）。
+  local swift_ver
+  swift_ver="$(swift --version 2>&1 || true)"
+  printf '%s\n' "$(printf '%s\n' "$swift_ver" | sed -n '1,2p')"
+  printf '%s\n' "$(xcodebuild -version 2>&1 | sed -n '1p' || true)"
+}
 
-build_zero_warnings debug
-run_tests debug 2
+stage_build() {
+  build_zero_warnings debug
+  build_zero_warnings release
+}
 
-# 坑 #8：release 优化会改时序，双跑是纪律不是可选。
-build_zero_warnings release
-run_tests release 2
+stage_test() {
+  run_tests debug 2
+  # 坑 #8：release 优化会改时序，双跑是纪律不是可选。
+  run_tests release 2
+}
 
-demo_smoke
+stage_demo() { demo_smoke; }
+
+case "${1:-all}" in
+  build) toolchain; stage_build ;;
+  test)  stage_test ;;
+  demo)  stage_demo ;;
+  all)   toolchain; stage_build; stage_test; stage_demo ;;
+  *)     fail "未知阶段：$1（可选 build / test / demo / all）" ;;
+esac
 
 printf '\n\033[32m全部通过\033[0m\n'

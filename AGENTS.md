@@ -6,7 +6,7 @@
 
 **swiftus** 是 [conatus](https://github.com/Fi2zz/conatus)（Dart 实现的「时空可组合性」编程范式框架：可逆效应 + 反应式共效应）的 Swift 移植版，命名延续 cordis（TS）→ conatus（Dart）→ swiftus（Swift）的拉丁谱系。移植动机是摆脱 Dart 运行时单一依赖，使框架成为语言中立的资产。
 
-**当前状态（2026-09-30）**：**移植范围全部收口（W1–W3 完成）**——W1 的 core / credentials 最小集 / llm / prompt / tool / skill 之上，Compaction / Schedule / session 持久化层 / Agent 全特性 / 任务中心全部就位；W3 的凭据全量 + SigV4（S12 v1.1 / S15）、Foundation 全部 14 个能力域（S18 fs+shell、S19 database/timer/time-context/logger/loader）、Cron（S9）、联网搜索与抓取（S20）、MCP 客户端（S11）均已落地。离线 Demo `swift run swiftus-demo` 跑通「提问 → 工具调用 → 回填 → 收口」，并**逐段演示**会话持久化（S4）/ 任务中心（S17）/ 提醒（S8）/ 定时任务交付（S9）/ 联网搜索（S20）/ MCP server 工具（S11）——一条会话贯穿全程，全部离线（脚本化模型 + 进程内 MCP server + 临时目录，无需 Key / 无需网络）。swift-testing 345 例 71 套件 debug+release 双绿、release 零警告。外部依赖：Yams（仅 SwiftusSkill）+ 系统 CryptoKit（SigV4）。平台 floor macOS 13 / iOS 16（§5.6 抬升；iOS 侧已逐 target 实测可编译：**shell 与 MCP 的 stdio 领域整体只在 macOS 存在**，iOS 表面不暴露）。没有 CI。
+**当前状态（2026-09-30）**：**移植范围全部收口（W1–W3 完成）**——W1 的 core / credentials 最小集 / llm / prompt / tool / skill 之上，Compaction / Schedule / session 持久化层 / Agent 全特性 / 任务中心全部就位；W3 的凭据全量 + SigV4（S12 v1.1 / S15）、Foundation 全部 14 个能力域（S18 fs+shell、S19 database/timer/time-context/logger/loader）、Cron（S9）、联网搜索与抓取（S20）、MCP 客户端（S11）均已落地。离线 Demo `swift run swiftus-demo` 跑通「提问 → 工具调用 → 回填 → 收口」，并**逐段演示**会话持久化（S4）/ 任务中心（S17）/ 提醒（S8）/ 定时任务交付（S9）/ 联网搜索（S20）/ MCP server 工具（S11）——一条会话贯穿全程，全部离线（脚本化模型 + 进程内 MCP server + 临时目录，无需 Key / 无需网络）。swift-testing 345 例 71 套件 debug+release 双绿、release 零警告。外部依赖：Yams（仅 SwiftusSkill）+ 系统 CryptoKit（SigV4）。平台 floor macOS 13 / iOS 16（§5.6 抬升；iOS 侧已逐 target 实测可编译：**shell 与 MCP 的 stdio 领域整体只在 macOS 存在**，iOS 表面不暴露）。CI 已落地（verify / ios / fixtures 三 job）。
 
 移植范围（已拍板）：
 
@@ -23,7 +23,7 @@
 ## 技术栈与构建
 
 - 语言/工具链：Swift 6（`swift-tools-version: 6.0`，当前实测 Swift 6.3.3），**Swift 6 strict concurrency** 语境下开发；
-- 包管理：Swift Package Manager 单仓库多 target，无 `Package.resolved`（尚未引入外部依赖）；
+- 包管理：Swift Package Manager 单仓库多 target，外部依赖仅 Yams（SwiftusSkill 的 frontmatter 解析），`Package.resolved` **入库**以钉住解析结果、保证 CI 可复现；
 - 平台：`Package.swift` 声明 **macOS 13 / iOS 16** floor（2026-09-27 抬升：并发 API / AsyncBytes / Clock 突破工具链默认值，详见方案书 §5.6）；
 - CI：`.github/workflows/ci.yml`，三个 job——`verify`（debug/release 零警告 + 测试各双跑 + Demo 冒烟）、`ios`（13 个 target 编译 + 符号表核验平台专属域缺席）、`fixtures`（从 `tool/export_fixtures/CONATUS_PIN` 钉住的 conatus 提交重跑导出器并 diff）。**逻辑都在 `tool/ci/*.sh`**，CI 与本地跑同一份命令；改验证方式只改脚本，不用同步两处；
 - 许可证：MIT。
@@ -46,7 +46,7 @@ CI 的三个 job 调的就是上面三个脚本——**门禁与本地验证是�
 ## 仓库布局与模块划分
 
 ```
-Package.swift               # 唯一清单：13 个 library target，无外部依赖
+Package.swift               # 唯一清单：13 个 library target，外部依赖仅 Yams
 Sources/
   Swiftus/                  # 伞产品：仅 @_exported import 其余 12 个 target
   SwiftusCore/              # 内核：Context / EffectScope / Reactor（可逆效应语义）
@@ -122,7 +122,7 @@ docs/.handoffs/             # 两份权威文档（中文，移植的全部决�
 - **动态 JSON**：内部事件载荷统一 `JSONValue` 枚举（object/array/string/number/bool/null；number 必须 Int64 / Double 双形态，否则 SigV4 与 seq 边界会炸），落盘边界用 Codable 编解码到 JSONValue；
 - **并发**：Context / Reactor / EffectScope 先做「单 actor 承载整棵上下文树」的保守方案，性能不足再切非隔离 + 显式同步；**禁止用 `@unchecked Sendable` 蒙混过关**（并发洞 fixtures 抓不到）；
 - **效应撤销 × Task 取消**：`dispose()` 保持同步签名；异步清理登记为「同步触发 + 句柄入桶」；上下文释放时取消该上下文派生的全部 Task；「Task 已取消后又登记」的竞态必须有 fixture；
-- **外部依赖最小集**（尚未加入 Package.swift，需要时再引）：Yams（仅 skill frontmatter）、CryptoKit（SigV4 HMAC；若考虑 Linux 用 swift-crypto）；网络层统一 URLSession（含 WebSocketTask / bytes 流），**不引第三方 HTTP 框架**；
+- **外部依赖最小集**：SwiftPM 目前仅 Yams（仅 skill frontmatter，已入 `Package.swift`）；CryptoKit（SigV4 HMAC）为系统框架，若考虑 Linux 用 swift-crypto；网络层统一 URLSession（含 WebSocketTask / bytes 流），**不引第三方 HTTP 框架**；
 - **不移植** Windows 分支（cmd /c）；原子写沿用「临时文件 + rename」。
 
 ## 已知坑清单（方案书 §六，动手前必读）
