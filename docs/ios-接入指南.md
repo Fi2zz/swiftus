@@ -192,6 +192,15 @@ try await credentials.update("ARK_API_KEY", "sk-…")    // 先落 Keychain，�
 - **shell 领域整个不存在于 iOS**（无子进程）：`ShellExecutor` 端口、`shell` 服务键、本地后端、S17 的 shell 追踪装饰器全部收在 `#if os(macOS)` 内，iOS 表面不暴露。将来要在 iOS 跑命令（WKWebView JS 沙箱 / 端侧执行服务）需按 S18 协议新增实现；
 - **fs / database 走宿主磁盘，iOS 上受沙盒约束**：只能碰 Application Support / Documents，「任意路径读写」不成立。`JsonDatabaseBackend` 缺省目录已按平台分支（iOS 落 Application Support/database）。
 
+### ⑤ Schedule / Cron / Timer 是前台语义，挂起即停
+
+`ScheduleRuntime`（提醒）、`CronRuntime`（定时任务）、`Timer`（可逆定时器）的驱动全部是**进程内 `Task.sleep` 定时器 + 墙钟采样**。iOS app 进后台被系统挂起后，这些定时器**不再推进**——本库不接入 BGTaskScheduler / 本地通知等系统级调度，那是宿主的职责。两条语义要分清：
+
+- **挂起期间不会准点投递**：想要「用户不在前台也准时看到」，宿主应在挂起前把提醒转成交付式本地通知（`UNUserNotificationCenter`）；
+- **过期记录不丢失，恢复后补发**：墙钟在挂起期间照走，恢复前台后下一次到期判定采样到的 `now` 已越过目标时刻，判定为到期 → 一次性提醒 / 错过的 cron daily 时段各补发一次（S8 §8 / S9 §5 的 missed-slot 语义，fixtures 钉住）。
+
+cron 的到期判定是可脱离运行时单独调用的纯函数（S9 §5）——要接系统级后台调度的宿主，可以由 BGTaskScheduler 唤醒后手动调判定 + 投递。
+
 ## 5. 平台能力对照
 
 | 能力 | iOS | macOS |
@@ -200,14 +209,14 @@ try await credentials.update("ARK_API_KEY", "sk-…")    // 先落 Keychain，�
 | Foundation 14 域中的 fs / database / logger / timer / loader / time-context / session / tools / prompt / memory | ✅（受沙盒约束） | ✅ |
 | Skills（Yams 解析 frontmatter） | ✅（需引入 Yams） | ✅ |
 | Credentials 五来源 + SigV4 + 可插拔来源端口（S12 §7.5） | ✅（env 来源在 iOS 无意义） | ✅ |
-| LLM / Compaction / Schedule / Agent / Tasks | ✅ | ✅ |
-| Cron / Search | ✅ | ✅ |
+| LLM / Compaction / Schedule / Agent / Tasks | ✅（Schedule 前台语义，见 ⑤） | ✅ |
+| Cron / Search | ✅（Cron 前台语义，见 ⑤） | ✅ |
 | **MCP** | ✅（stdio 传输不可用；http / sse 可用） | ✅ |
 | **shell（执行命令）** | ❌ 整域不存在 | ✅ |
 
 ## 6. 验证样例本身没腐化
 
-样例不入 SwiftPM target（它在 `docs/` 下），改动后请手工跑一次 iOS 类型检查：
+样例不入 SwiftPM target（它在 `docs/` 下），**自检已编入 `tool/ci/ios.sh` 末段**（CI 与本地同一份命令，样例过时会直接红）。手工单跑：
 
 ```bash
 # 1) 先为 iOS 编译出各模块（产物在 /tmp/iosdd/Build/Products/Debug-iphoneos）
@@ -234,4 +243,5 @@ xcrun -sdk iphoneos swiftc -target arm64-apple-ios16.0 -typecheck -swift-version
 - **无内置 Keychain 凭据来源**，但 S12 §7.5 提供了可插拔端口：实现 `WritableCredentialStore` 即可接入（见 §3 ③），或用文件来源；
 - **iOS 无 shell 后端**（整域只在 macOS）；**MCP 的 stdio 传输**同样只在 macOS（http / sse 在 iOS 可用）；
 - **沙箱约束**：fs / database 只能碰 Application Support / Documents（见 §4 ④）；
+- **无后台调度**：Schedule / Cron / Timer 是进程内前台语义，挂起即停、恢复补发（见 §4 ⑤）；需要后台准时性由宿主接 BGTaskScheduler / 本地通知；
 - CI 三 job（verify / ios / fixtures）见仓库 `.github/workflows/ci.yml`。

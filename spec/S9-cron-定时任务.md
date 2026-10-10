@@ -126,6 +126,7 @@
 
 - `CronService` / `CronRegistry` / `CronHistoryBook` / `CronRuntime` 全部 `@ContextTreeActor`；`CronStorage` / `CronNotifier` / 交付端口显式标 `: Sendable`；
 - **墙钟一律注入**（`now: @Sendable () -> Date`）与 S19 `TimerDriver` 同款纪律；运行时的 tick 用 `TimerDriver`，测试可手动推进；
+- **iOS 上是前台语义（2026-10-10 注记，与 S8 同款）**：3s/15s 的 tick 是进程内定时器，挂起期间不跑，**挂起期间不会准点触发**；恢复前台后下一次 tick 采样墙钟，过期时段按 §5 的 missed-slot 语义补发（daily「整天错过仍补发一次」由 fixtures 钉住）。本域不接入 BGTaskScheduler / 本地通知——需要后台准时性的宿主应自建系统级调度，触发时再调用 cron 的到期判定纯函数（§5 可脱离运行时单独调用）；
 - **cron 表达式引擎是纯函数**，可直接用「已知表达式 → 已知触发时刻」的对拍表验证（Dart 侧 `cron_parse_test.dart` 有同款断言，导出成 fixtures）；
 - 内部缓存（解析结果 / 下一分钟）用 `class` 内的可变字段承载（`CronTask` 是类不是 struct，否则每次改都要回写表）；
 - **「今日这一格已消费」的 daily 语义**（§5）是 missed-slot 补发的关键，fixtures 必须覆盖「整天错过仍补发一次」与「已消费不再补发」两条；

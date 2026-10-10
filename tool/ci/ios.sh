@@ -54,4 +54,23 @@ object_of() {
 assert_absent_symbol "$(object_of SwiftusMCP)" "StdioTransport"
 assert_absent_symbol "$(object_of SwiftusFoundation)" "ShellExecutor"
 
+# ── 样例自检：docs/samples 的消费方视角代码必须始终可编译 ──
+# 样例不入 SwiftPM target（在 docs/ 下），过时会静默失效——S11 schema 覆写
+# 那次坑的同类风险（端到端才暴露），故与 13 个 target 同列门禁。
+log "样例自检：docs/samples/IosIntegrationSample.swift 类型检查（iOS）"
+PRODUCTS="${DERIVED}/Build/Products/Debug-iphoneos"
+CYAML_INCLUDE="$(find "${DERIVED}/SourcePackages/checkouts/Yams/Sources/CYaml/include" \
+  -name module.modulemap 2>/dev/null | sed -n '1p' || true)"
+if [[ -z "$CYAML_INCLUDE" ]]; then
+  fail "找不到 CYaml 的 module map（伞产品 import SwiftusSkill 需要它）"
+fi
+if xcrun -sdk iphoneos swiftc -target arm64-apple-ios16.0 -typecheck -swift-version 6 \
+    -I "$PRODUCTS" \
+    -Xcc -fmodule-map-file="$CYAML_INCLUDE" -Xcc -I"$(dirname "$CYAML_INCLUDE")" \
+    docs/samples/IosIntegrationSample.swift; then
+  printf '  %-22s OK\n' 'IosIntegrationSample'
+else
+  fail "docs/samples/IosIntegrationSample.swift 在 iOS 上类型检查失败（样例过时？先同步 docs/ios-接入指南.md）"
+fi
+
 printf '\n\033[32m全部通过\033[0m\n'
