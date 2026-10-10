@@ -3,13 +3,14 @@
 [conatus](https://github.com/Fi2zz/conatus)（Dart 实现的「时空可组合性」编程范式：可逆效应 + 反应式共效应）的 Swift 移植版。命名延续 cordis（TS）→ conatus（Dart）→ swiftus（Swift）的拉丁谱系——移植的动机是**摆脱 Dart 运行时单一依赖，让这套范式成为语言中立的资产**。
 
 - 语言 / 工具链：Swift 6（`swift-tools-version: 6.0`），在 **strict concurrency** 语境下开发
-- 平台下限：macOS 13 / iOS 16——**iOS 侧已实测可编译**（`xcodebuild -destination 'generic/platform=iOS'`，13 个 target 全部通过）
+- 主消费场景：**iOS app**（macOS 同样支持）——iOS 侧 13 个 target 实测可编译（`xcodebuild -destination 'generic/platform=iOS'`），接入指南见 `docs/ios-接入指南.md`
+- 平台下限：macOS 13 / iOS 16
 - 外部依赖：**Yams 5.x**（仅 `SwiftusSkill` 用它解析 frontmatter）+ 系统 `CryptoKit`（SigV4 签名）
 - 许可：MIT
 
-## 当前状态（2026-10-08）
+## 当前状态（2026-10-10，v0.1.6）
 
-**W1 / W2 / W3 全部收口**——12 个 conatus 包、规格 S1–S20、golden fixtures 全部落地。swift-testing **350 例 72 套件 debug + release 双绿**，release 构建零警告，CI 三 job（verify / ios / fixtures）就位。
+**W1 / W2 / W3 全部收口**——12 个 conatus 包、规格 S1–S20、golden fixtures 全部落地。swift-testing **354 例 73 套件 debug + release 双绿**，release 构建零警告，CI 三 job（verify / ios / fixtures）就位，`docs/samples` 的 iOS 样例自检也已编入门禁。
 
 | 波次 | 范围 | 状态 |
 |---|---|---|
@@ -24,6 +25,65 @@
 swift run swiftus-demo
 ```
 
+## 30 秒上手
+
+代码取自 `docs/samples/IosIntegrationSample.swift`（以 iOS SDK 类型检查验证过，非伪代码）；`makeConfig()` / `apiKeysJsonPath` 是宿主侧的端点配置与文件路径，见样例全文：
+
+```swift
+import Swiftus
+
+@ContextTreeActor
+enum QuickStart {
+    /// 装配：上下文树 → 凭据 → 工具 → prompt → LLM。
+    static func bootstrap() throws -> Context {
+        let app = Context.root(name: "my-app")
+
+        // 凭据：Key 放沙盒文件（{"ARK_API_KEY": "sk-xxx"}），别硬编码进二进制。
+        let credentials = FileCredentials(path: apiKeysJsonPath)
+        _ = try provideCredentials(app, credentials: credentials)
+
+        // 工具：注册进白名单管线（schema 投影 / 参数校验 / 失败码收敛都在管线里）。
+        let tools = try provideTools(app)
+        try tools.fn("now", description: "返回当前时刻") { _ in
+            .success(ISO8601DateFormatter().string(from: Date()))
+        }
+
+        _ = try provideSystemPrompt(app)   // system prompt 装配
+        _ = try provideTimePrompt(app)     // 日粒度「今天」注入（跨天自动更新）
+        _ = OpenAiCompatibleProvider(config: makeConfig(), credentials: credentials)
+        return app
+    }
+
+    /// 跑一轮：工具描述 → 调模型 → 执行工具 → 回填 → 收口。
+    static func ask(_ app: Context, _ question: String) async throws -> String {
+        let tools = try app.require(.tools)
+        let prompt = try app.require(.systemPrompt)
+        let llm = OpenAiCompatibleProvider(
+            config: makeConfig(),
+            credentials: try app.require(.credentials)
+        )
+
+        var messages: [LlmMessage] = [
+            LlmMessage("system", prompt.renderContexts(prompt.assemble())),
+            LlmMessage("user", question),
+        ]
+        for _ in 0..<8 {
+            let result = try await llm.chat(LlmRequest(messages: messages, tools: tools.describe()))
+            guard !result.toolCalls.isEmpty else { return result.content }
+            messages.append(.toolCallRequest(result.toolCalls, content: result.content))
+            for call in result.toolCalls {
+                let args = (try? JSONValue.parse(Data(call.arguments.utf8)))?.objectValue ?? [:]
+                let outcome = await tools.call(ToolCall(name: call.name, callId: call.id, arguments: args))
+                messages.append(.toolResult(call.id, outcome.content))
+            }
+        }
+        return "（达到轮次上限）"
+    }
+}
+```
+
+要点：所有 `Context` 成员都是 `@ContextTreeActor` 隔离——SwiftUI 视图模型别直接碰，套一个 `@ContextTreeActor` 的 runtime 盒子，再在 `Task` 里跨 actor 调用（完整 SwiftUI 接线见 `docs/samples/IosIntegrationSample.swift`）。要 Agent Loop（自动多轮 / 规划 / 审批）而不是手写回路，用 `SwiftusAgent` 的 `AgentLoop`；更多域（会话持久化 / 任务中心 / cron / 搜索 / MCP）按「模块地图」取用。
+
 ## 模块地图
 
 依赖方向自上而下无环，镜像 conatus 的包结构（以 `Package.swift` 为准）：
@@ -31,7 +91,7 @@ swift run swiftus-demo
 | target | 行数 | 依赖 | 职责 |
 |---|---|---|---|
 | `SwiftusCore` | 649 | —（只 `import Foundation`） | 上下文树 / 可逆效应（LIFO 撤销·幂等·迟到登记）/ Reactor / `ServiceKey` / `JSONValue` / `Redaction` |
-| `SwiftusFoundation` | 4,938 | Core | 14 个能力域：tools / session / session-log / system-prompt / memory / database / fs / shell / time-context / timer / logger / loader / ask-user / uuid |
+| `SwiftusFoundation` | 4,947 | Core | 14 个能力域：tools / session / session-log / system-prompt / memory / database / fs / shell / time-context / timer / logger / loader / ask-user / uuid |
 | `SwiftusCredentials` | 1,101 | Core | 五种来源（env / memory / file / vault / aws）+ AWS SigV4 签名链 + 可插拔来源端口（S12 §7.5） |
 | `SwiftusLLM` | 925 | Core, Credentials | chat / responses 双形态、流式增量、fallback 链 |
 | `SwiftusCompaction` | 554 | Core, Foundation | 压缩切点（平衡切点）算法 |
@@ -84,13 +144,15 @@ bash tool/export_fixtures/export.sh
 ## 验证
 
 ```bash
-swift build && swift test                          # debug
-swift build -c release && swift test -c release    # release（时序会变，必须双跑）
+bash tool/ci/verify.sh     # 门禁①：debug/release 零警告 + 测试各双跑 + Demo 冒烟
+bash tool/ci/ios.sh        # 门禁②：iOS 13 target 编译 + 符号表核验 + 样例自检
+bash tool/ci/fixtures.sh   # 门禁③：从 CONATUS_PIN 重跑导出器并 diff（需 conatus）
+
+swift build && swift test                          # 单步调试用
 swift run swiftus-demo                             # 离线端到端 Demo
-bash tool/export_fixtures/export.sh                # fixtures 重新导出
 ```
 
-波次出口门槛：fixtures 全绿 + swift-testing 覆盖语义关键点 + `swift build -c release` 零警告。CI 三个 job（verify / ios / fixtures）见 `.github/workflows/ci.yml`，逻辑在 `tool/ci/*.sh`，**本地与 CI 跑同一份命令**。
+波次出口门槛：fixtures 全绿 + swift-testing 覆盖语义关键点 + `swift build -c release` 零警告。CI 三个 job 调的就是上面三个脚本（`.github/workflows/ci.yml`），**本地与 CI 跑同一份命令**。
 
 ## 文档
 
