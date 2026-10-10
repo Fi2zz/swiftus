@@ -65,7 +65,7 @@ func s17FixedClock() -> Date {
     s17FixedInstant
 }
 
-/// ISO8601 时刻序列化（UTC、小数秒），与 Task.jsonValue 同款。
+/// ISO8601 时刻序列化（UTC、小数秒），与 SwiftusTask.jsonValue 同款。
 func s17InstantString(_ date: Date) -> String {
     date.formatted(Date.ISO8601FormatStyle(includingFractionalSeconds: true))
 }
@@ -84,7 +84,7 @@ func s17ValueShape(_ value: JSONValue?) -> String {
 
 /// 任务投影：id 归一化、时刻折叠为布尔；errorShape 只在 persisted 时给出。
 @ContextTreeActor
-func s17Project(_ task: Task, _ ids: TaskIdNormalizer, persisted: Bool = false) -> [String: JSONValue] {
+func s17Project(_ task: SwiftusTask, _ ids: TaskIdNormalizer, persisted: Bool = false) -> [String: JSONValue] {
     var out: [String: JSONValue] = [
         "id": .string(ids(task.id)),
         "kind": .string(task.kind.rawValue),
@@ -105,7 +105,7 @@ func s17Project(_ task: Task, _ ids: TaskIdNormalizer, persisted: Bool = false) 
 }
 
 @ContextTreeActor
-func s17ProjectTasks(_ tasks: [Task], _ ids: TaskIdNormalizer) -> [JSONValue] {
+func s17ProjectTasks(_ tasks: [SwiftusTask], _ ids: TaskIdNormalizer) -> [JSONValue] {
     tasks.map { .object(s17Project($0, ids)) }
 }
 
@@ -115,7 +115,7 @@ func s17ProjectLog(_ session: Session, _ ids: TaskIdNormalizer) throws -> [JSONV
     try session.ownEvents.map { event in
         var entry: [String: JSONValue] = ["type": .string(event.type), "task": .null]
         if event.type == kTaskEvent, let data = event.data {
-            entry["task"] = .object(s17Project(try Task(jsonValue: data), ids, persisted: true))
+            entry["task"] = .object(s17Project(try SwiftusTask(jsonValue: data), ids, persisted: true))
         }
         return .object(entry)
     }
@@ -142,7 +142,7 @@ final class TaskHarness {
     let ids = TaskIdNormalizer()
     /// 本份 harness 的定值时刻（构造时取一次，其后所有取样都返回它）。
     let instant: Date
-    private(set) var changes: [Task] = []
+    private(set) var changes: [SwiftusTask] = []
 
     init(approval: (any Approval)? = nil) throws {
         session = try Session(id: "s1")
@@ -160,8 +160,8 @@ final class TaskHarness {
     /// 开始收集变更流（订阅在调用点同步建立，只收订阅之后的事件，对齐 broadcast 语义）。
     func startCollecting() {
         let stream = center.changes
-        // 本 target 另有 Task 值类型，收集任务需写全 _Concurrency.Task。
-        _Concurrency.Task { [self] in
+        // 任务值类型已改名 SwiftusTask，裸 Task 不再被遮蔽。
+        Task { [self] in
             for await task in stream {
                 changes.append(task)
             }
@@ -170,15 +170,15 @@ final class TaskHarness {
 
     /// 让变更收集器跑一轮（AsyncStream 缓冲由消费侧排空）。
     func drain() async {
-        await _Concurrency.Task.yield()
-        await _Concurrency.Task.yield()
+        await Task.yield()
+        await Task.yield()
     }
 
     /// 等到收集到的变更条数达到期望值（AsyncStream 订阅是异步落位的）。
     func waitForChanges(_ minimum: Int) async {
         for _ in 0..<200 {
             if changes.count >= minimum { return }
-            try? await _Concurrency.Task.sleep(for: .milliseconds(2))
+            try? await Task.sleep(for: .milliseconds(2))
         }
     }
 }
@@ -250,7 +250,7 @@ func s17Text(_ content: String) -> LlmResult {
 func s17WaitTerminal(_ center: any TaskCenter, _ id: String) async throws {
     for _ in 0..<400 {
         if let task = center.get(id), task.isTerminal { return }
-        try await _Concurrency.Task.sleep(for: .milliseconds(5))
+        try await Task.sleep(for: .milliseconds(5))
     }
     Issue.record("任务 \(id) 未在 2 秒内落定")
 }

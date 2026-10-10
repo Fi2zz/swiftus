@@ -73,5 +73,7 @@ let package = Package(
             "SwiftusTasks", "SwiftusAgent", "SwiftusFoundation", "SwiftusSchedule",
         ]),
         .testTarget(name: "SwiftusDemoTests", dependencies: ["SwiftusDemo"]),
+        // 伞包回归：守「裸 Task 不被任务中心类型遮蔽」与「伞包可见性」。
+        .testTarget(name: "SwiftusUmbrellaTests", dependencies: ["Swiftus"]),
     ]
 )

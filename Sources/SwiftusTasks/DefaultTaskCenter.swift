@@ -15,7 +15,7 @@ public final class DefaultTaskCenter: TaskCenter {
     private var session: Session?
     private var approval: (any Approval)?
     private var telemetry: (any Telemetry)?
-    private var stored: [String: Task] = [:]
+    private var stored: [String: SwiftusTask] = [:]
     private var insertionOrder: [String] = []
     private var cancellers: [String: @ContextTreeActor () async -> Void] = [:]
     private var seq = 0
@@ -23,7 +23,7 @@ public final class DefaultTaskCenter: TaskCenter {
     private let clock: @Sendable () -> Date
 
     private struct State {
-        var subscribers: [UUID: AsyncStream<Task>.Continuation] = [:]
+        var subscribers: [UUID: AsyncStream<SwiftusTask>.Continuation] = [:]
         var closed = false
     }
 
@@ -51,7 +51,7 @@ public final class DefaultTaskCenter: TaskCenter {
         }
     }
 
-    public var changes: AsyncStream<Task> {
+    public var changes: AsyncStream<SwiftusTask> {
         AsyncStream { continuation in
             let token = UUID()
             broadcast.withLock { current -> Void in
@@ -79,11 +79,11 @@ public final class DefaultTaskCenter: TaskCenter {
         description: String,
         parentTaskId: String? = nil,
         metadata: [String: JSONValue] = [:]
-    ) async throws -> Task {
+    ) async throws -> SwiftusTask {
         try ensureOpen()
         seq += 1
         let now = clock()
-        let task = Task(
+        let task = SwiftusTask(
             id: "task-\(seq)-\(taskMicroseconds(now))",
             kind: kind,
             status: .pending,
@@ -105,7 +105,7 @@ public final class DefaultTaskCenter: TaskCenter {
         status: TaskStatus? = nil,
         result: JSONValue? = nil,
         error: JSONValue? = nil
-    ) async throws -> Task {
+    ) async throws -> SwiftusTask {
         try ensureOpen()
         guard let existing = stored[id] else { throw TaskError.notFound(id: id) }
         if existing.isTerminal { throw TaskError.alreadyTerminal(id: id) }
@@ -130,24 +130,24 @@ public final class DefaultTaskCenter: TaskCenter {
         return updated
     }
 
-    public func get(_ id: String) -> Task? {
+    public func get(_ id: String) -> SwiftusTask? {
         stored[id]
     }
 
-    public var all: [Task] {
+    public var all: [SwiftusTask] {
         insertionOrder.compactMap { stored[$0] }
     }
 
-    public var active: [Task] {
+    public var active: [SwiftusTask] {
         all.filter(\.isActive)
     }
 
-    public func children(of parentId: String) -> [Task] {
+    public func children(of parentId: String) -> [SwiftusTask] {
         all.filter { $0.parentTaskId == parentId }
     }
 
-    public func subtree(of id: String) -> [Task] {
-        var result: [Task] = []
+    public func subtree(of id: String) -> [SwiftusTask] {
+        var result: [SwiftusTask] = []
         var frontier = [id]
         while let current = frontier.popLast() {
             if let task = stored[current] {
@@ -212,7 +212,7 @@ public final class DefaultTaskCenter: TaskCenter {
         // 锁内只取出订阅者、锁外再 finish：finish() 会同步触发 onTermination，
         // 而 onTermination 回调要再进同一把锁（OSAllocatedUnfairLock 不可重入，
         // 锁内 finish 会触发 _os_unfair_lock_recursive_abort）。
-        let subscribers: [AsyncStream<Task>.Continuation] = broadcast.withLock { current in
+        let subscribers: [AsyncStream<SwiftusTask>.Continuation] = broadcast.withLock { current in
             current.closed = true
             let alive = Array(current.subscribers.values)
             current.subscribers.removeAll()
@@ -250,18 +250,18 @@ public final class DefaultTaskCenter: TaskCenter {
     // 落盘 / 埋点 / 广播
     // ══════════════════════════════════════════════════════════════
 
-    private func store(_ task: Task) {
+    private func store(_ task: SwiftusTask) {
         if stored[task.id] == nil {
             insertionOrder.append(task.id)
         }
         stored[task.id] = task
     }
 
-    private func persist(_ task: Task) throws {
+    private func persist(_ task: SwiftusTask) throws {
         try resolveSession()?.append(kTaskEvent, data: task.jsonValue)
     }
 
-    private func emit(_ name: String, _ task: Task) {
+    private func emit(_ name: String, _ task: SwiftusTask) {
         resolveTelemetry()?.emit(TelemetryEvent(name, data: [
             "id": .string(task.id),
             "kind": .string(task.kind.rawValue),
@@ -270,7 +270,7 @@ public final class DefaultTaskCenter: TaskCenter {
         ]))
     }
 
-    private func emitTransition(from previous: Task, to current: Task) {
+    private func emitTransition(from previous: SwiftusTask, to current: SwiftusTask) {
         switch (previous.status, current.status) {
         case (.pending, .running):
             emit("task.started", current)
@@ -289,8 +289,8 @@ public final class DefaultTaskCenter: TaskCenter {
 
     /// 广播一次变更：锁内只取订阅者快照，yield 在锁外做（yield 可能同步触发
     /// 消费者的 onTermination，而它要再进同一把锁——同 dispose 的坑）。
-    private func publish(_ task: Task) {
-        let subscribers: [AsyncStream<Task>.Continuation] = broadcast.withLock { current in
+    private func publish(_ task: SwiftusTask) {
+        let subscribers: [AsyncStream<SwiftusTask>.Continuation] = broadcast.withLock { current in
             guard !current.closed else { return [] }
             return Array(current.subscribers.values)
         }
@@ -300,7 +300,7 @@ public final class DefaultTaskCenter: TaskCenter {
     }
 
     /// shell 类任务取消前的审批确认（规格 S17 §2 cancel ②）。
-    private func confirmCancel(_ task: Task) async throws {
+    private func confirmCancel(_ task: SwiftusTask) async throws {
         guard let approval = resolveApproval(), task.kind == .shell else { return }
         let granted = await approval.request(ApprovalRequest(
             id: "cancel-\(task.id)",

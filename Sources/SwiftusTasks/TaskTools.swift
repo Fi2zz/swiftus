@@ -8,7 +8,7 @@ public let kListTasksToolName = "list_tasks"
 public let kCancelTasksToolName = "cancel_task"
 
 /// 把任务列表格式化为口语化播报文本（语音场景，规格 S17 §4）。
-public func describeTasks(_ tasks: [Task], now: Date = Date()) -> String {
+public func describeTasks(_ tasks: [SwiftusTask], now: Date = Date()) -> String {
     guard !tasks.isEmpty else { return "现在没有任务。" }
     var text = "现在共 \(tasks.count) 个任务："
     for (index, task) in tasks.enumerated() {

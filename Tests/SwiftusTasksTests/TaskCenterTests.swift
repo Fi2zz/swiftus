@@ -28,13 +28,13 @@ struct TaskCenterTests {
         harness.center.dispose()
         var finished = false
         let stream = harness.center.changes
-        _Concurrency.Task {
+        Task {
             for await _ in stream { Issue.record("dispose 后不应再收到事件") }
             finished = true
         }
         for _ in 0..<200 {
             if finished { break }
-            try await _Concurrency.Task.sleep(for: .milliseconds(2))
+            try await Task.sleep(for: .milliseconds(2))
         }
         #expect(finished)
     }
@@ -170,10 +170,10 @@ struct TaskCenterTests {
     @Test("createdAt 缺失或非法抛 invalid-created-at")
     func invalidCreatedAt() {
         #expect(throws: TaskError.invalidCreatedAt) {
-            try Task(jsonValue: .object(["id": .string("x")]))
+            try SwiftusTask(jsonValue: .object(["id": .string("x")]))
         }
         #expect(throws: TaskError.invalidCreatedAt) {
-            try Task(jsonValue: .object([
+            try SwiftusTask(jsonValue: .object([
                 "id": .string("x"),
                 "createdAt": .string("不是时刻"),
             ]))
@@ -306,7 +306,7 @@ struct TaskCenterTests {
         _ = process.kill()
         await process.done.value
         // 给追踪任务一点落定时间：它会因中心已释放而失败并被静默吞掉。
-        try await _Concurrency.Task.sleep(for: .milliseconds(50))
+        try await Task.sleep(for: .milliseconds(50))
         // dispose 后的落定失败被吞掉：不抛错、任务停在 running。
         #expect(center.all.first?.status == .running)
     }

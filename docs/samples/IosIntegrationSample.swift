@@ -106,7 +106,7 @@ final class ChatViewModel: ObservableObject {
 
     func start() {
         // 装配也要跨进 ContextTreeActor；写回 MainActor 的属性要显式 hop。
-        _Concurrency.Task { [weak self] in
+        Task { [weak self] in
             let made = try? await IosRuntime()
             // attach 是 MainActor 隔离的，但本闭包已继承 MainActor（Task 在
             // @MainActor 方法内创建）→ 无需再 await。
@@ -121,10 +121,9 @@ final class ChatViewModel: ObservableObject {
     func send(_ question: String) {
         busy = true
         guard let runtime else { return }
-        _Concurrency.Task { [weak self] in
-            // 注意：此处写 `_Concurrency.Task` 而非 `Task`——
-            // `import Swiftus` 会把 SwiftusTasks 的 `Task` 值类型 re-export 出来，
-            // 裸 `Task { }` 会解析到它并编不过（详见 docs/ios-接入指南.md）。
+        Task { [weak self] in
+            // 裸 `Task { }` 直接可用（早期 SwiftusTasks 的任务值类型名 `Task`
+            // 曾遮蔽并发 Task，已改名 `SwiftusTask`，规格 S17 §7）。
             let reply = try? await runtime.ask(question)
             // 闭包已继承 MainActor，写 @Published 属性无需再 hop。
             self?.finish(reply)

@@ -16,7 +16,7 @@ public protocol TaskCenter: Sendable {
         description: String,
         parentTaskId: String?,
         metadata: [String: JSONValue]
-    ) async throws -> Task
+    ) async throws -> SwiftusTask
 
     /// 更新任务状态（规格 S17 §2 update 协议）。
     ///
@@ -30,22 +30,22 @@ public protocol TaskCenter: Sendable {
         status: TaskStatus?,
         result: JSONValue?,
         error: JSONValue?
-    ) async throws -> Task
+    ) async throws -> SwiftusTask
 
     /// 查询单个任务；不存在返回 nil。
-    func get(_ id: String) -> Task?
+    func get(_ id: String) -> SwiftusTask?
 
     /// 全部任务（入表顺序）。
-    var all: [Task] { get }
+    var all: [SwiftusTask] { get }
 
     /// 活跃任务（pending + running + paused）。
-    var active: [Task] { get }
+    var active: [SwiftusTask] { get }
 
     /// 指定任务的直接子任务（入表顺序）。
-    func children(of parentId: String) -> [Task]
+    func children(of parentId: String) -> [SwiftusTask]
 
     /// 指定任务的整棵子树（含自己；栈式深度优先，规格 S17 §2）。
-    func subtree(of id: String) -> [Task]
+    func subtree(of id: String) -> [SwiftusTask]
 
     /// 取消任务：级联取消活跃子任务、执行注册过的取消回调；
     /// shell 类任务走 approval 确认（若提供）。拒绝抛 `cancelled`。
@@ -58,7 +58,7 @@ public protocol TaskCenter: Sendable {
     func registerCancel(_ id: String, canceller: @escaping @ContextTreeActor () async -> Void)
 
     /// 任务变更流（每次状态落盘后广播最新整值）。
-    var changes: AsyncStream<Task> { get }
+    var changes: AsyncStream<SwiftusTask> { get }
 
     /// 从 Session 恢复状态；未完成的活跃任务标记为 failed（执行环境已丢失）。
     func restore(_ session: Session) throws
@@ -70,7 +70,7 @@ public protocol TaskCenter: Sendable {
 extension TaskCenter {
     /// 创建根任务（无父任务、无元数据）。
     @discardableResult
-    public func create(kind: TaskKind, description: String) async throws -> Task {
+    public func create(kind: TaskKind, description: String) async throws -> SwiftusTask {
         try await create(kind: kind, description: description, parentTaskId: nil, metadata: [:])
     }
 
@@ -80,19 +80,19 @@ extension TaskCenter {
         kind: TaskKind,
         description: String,
         metadata: [String: JSONValue]
-    ) async throws -> Task {
+    ) async throws -> SwiftusTask {
         try await create(kind: kind, description: description, parentTaskId: nil, metadata: metadata)
     }
 
     /// 只改状态（不带结果与错误）。
     @discardableResult
-    public func update(_ id: String, status: TaskStatus) async throws -> Task {
+    public func update(_ id: String, status: TaskStatus) async throws -> SwiftusTask {
         try await update(id, status: status, result: nil, error: nil)
     }
 
     /// 改状态与结果（不带错误）。
     @discardableResult
-    public func update(_ id: String, status: TaskStatus?, result: JSONValue?) async throws -> Task {
+    public func update(_ id: String, status: TaskStatus?, result: JSONValue?) async throws -> SwiftusTask {
         try await update(id, status: status, result: result, error: nil)
     }
 }

@@ -107,7 +107,7 @@ extension TaskError: CustomStringConvertible {
 }
 
 /// 一个任务（规格 S17 §1）：整值替换更新，每次状态变更写一条 `task/changed`。
-public struct Task: Sendable, Equatable {
+public struct SwiftusTask: Sendable, Equatable {
     /// 任务唯一 ID。
     public let id: String
     /// 任务类型。
@@ -180,8 +180,8 @@ public struct Task: Sendable, Equatable {
         finishedAt: Date? = nil,
         result: JSONValue? = nil,
         error: JSONValue? = nil
-    ) -> Task {
-        Task(
+    ) -> SwiftusTask {
+        SwiftusTask(
             id: id,
             kind: kind,
             status: status ?? self.status,
@@ -262,12 +262,12 @@ public func taskErrorValue(_ error: (any Error)?) -> JSONValue? {
 ///（每个 id 只保留最后一个事件，整值替换），顺序为 id 首次出现序
 ///（对齐 Dart LinkedHashMap 的插入序，规格 S17 §1）。
 @ContextTreeActor
-public func restoreTaskState(_ session: Session) throws -> [Task] {
+public func restoreTaskState(_ session: Session) throws -> [SwiftusTask] {
     var order: [String] = []
-    var latest: [String: Task] = [:]
+    var latest: [String: SwiftusTask] = [:]
     for event in session.ownEvents where event.type == kTaskEvent {
         guard let data = event.data, case .object = data else { continue }
-        let task = try Task(jsonValue: data)
+        let task = try SwiftusTask(jsonValue: data)
         if latest[task.id] == nil {
             order.append(task.id)
         }

@@ -22,7 +22,7 @@ struct S17FixtureTests {
                 for entry in caseItem["cases"]?.arrayValue ?? [] {
                     let status = TaskStatus(rawValue: entry["status"]?.stringValue ?? "")
                     #expect(status != nil)
-                    let task = Task(
+                    let task = SwiftusTask(
                         id: "t1",
                         kind: .custom,
                         status: status ?? .pending,
@@ -36,12 +36,12 @@ struct S17FixtureTests {
                 #expect(try copyWithCase() == expect)
             case "round-trip":
                 let input = caseItem["input"] ?? .null
-                let task = try Task(jsonValue: input)
+                let task = try SwiftusTask(jsonValue: input)
                 // 往返：再序列化再解一次必须完全一致。
-                #expect(try Task(jsonValue: task.jsonValue) == task)
+                #expect(try SwiftusTask(jsonValue: task.jsonValue) == task)
                 #expect(try roundTripCase(of: task) == expect)
             case "tolerant-enums", "tolerant-instants":
-                #expect(try tolerantCase(of: Task(jsonValue: caseItem["input"] ?? .null)) == expect)
+                #expect(try tolerantCase(of: SwiftusTask(jsonValue: caseItem["input"] ?? .null)) == expect)
             default:
                 Issue.record("未知 scenario：\(caseItem["scenario"]?.stringValue ?? "")")
             }
@@ -50,7 +50,7 @@ struct S17FixtureTests {
 
     @ContextTreeActor
     private func copyWithCase() throws -> [String: JSONValue] {
-        let base = Task(
+        let base = SwiftusTask(
             id: "t1",
             kind: .custom,
             status: .running,
@@ -76,7 +76,7 @@ struct S17FixtureTests {
     }
 
     @ContextTreeActor
-    private func roundTripCase(of task: Task) throws -> [String: JSONValue] {
+    private func roundTripCase(of task: SwiftusTask) throws -> [String: JSONValue] {
         [
             "id": .string(task.id),
             "kind": .string(task.kind.rawValue),
@@ -95,7 +95,7 @@ struct S17FixtureTests {
     }
 
     @ContextTreeActor
-    private func tolerantCase(of task: Task) -> [String: JSONValue] {
+    private func tolerantCase(of task: SwiftusTask) -> [String: JSONValue] {
         [
             "id": .string(task.id),
             "kind": .string(task.kind.rawValue),
@@ -334,8 +334,8 @@ struct S17FixtureTests {
     }
 
     @ContextTreeActor
-    private func s17Sample(id: String = "t1", status: TaskStatus = .pending) -> Task {
-        Task(
+    private func s17Sample(id: String = "t1", status: TaskStatus = .pending) -> SwiftusTask {
+        SwiftusTask(
             id: id,
             kind: .custom,
             status: status,
@@ -373,7 +373,7 @@ struct S17FixtureTests {
         case "auto-restore":
             let session = try Session(id: "s1")
             let created = Date(timeIntervalSince1970: 1_789_000_000)
-            let stale = Task(
+            let stale = SwiftusTask(
                 id: "stale-1",
                 kind: .shell,
                 status: .running,
@@ -381,7 +381,7 @@ struct S17FixtureTests {
                 createdAt: created,
                 startedAt: created
             )
-            let done = Task(
+            let done = SwiftusTask(
                 id: "done-1",
                 kind: .custom,
                 status: .completed,
@@ -431,8 +431,8 @@ struct S17FixtureTests {
                 description: String,
                 ran: TimeInterval?,
                 result: JSONValue? = nil
-            ) -> Task {
-                Task(
+            ) -> SwiftusTask {
+                SwiftusTask(
                     id: id,
                     kind: kind,
                     status: status,

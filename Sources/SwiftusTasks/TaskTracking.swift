@@ -137,7 +137,7 @@ public final class TrackingTaskShellExecutor: ShellExecutor {
         return process
     }
 
-    private func begin(_ spec: ShellExecSpec) async throws -> Task {
+    private func begin(_ spec: ShellExecSpec) async throws -> SwiftusTask {
         let task = try await tasks.create(
             kind: .shell,
             description: "Shell: \(spec.command)",
@@ -151,8 +151,8 @@ public final class TrackingTaskShellExecutor: ShellExecutor {
     /// 执行结果本身（规格 S17 §5.4）。
     private func track(_ id: String, _ process: any ShellProcess) {
         let center = tasks
-        // 本 target 另有 Task 值类型，闭包任务需写全 _Concurrency.Task。
-        _Concurrency.Task<Void, Never> { [center] in
+        // 任务值类型已改名 SwiftusTask，裸 Task 不再被遮蔽（伞包回归用例守着）。
+        Task<Void, Never> { [center] in
             // done 落定后 exitCode 已是终值（同一 actor 上同步可读），不再 await。
             await process.done.value
             let exitCode = process.exitCode

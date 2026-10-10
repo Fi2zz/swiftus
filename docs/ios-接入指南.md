@@ -96,24 +96,17 @@ static func ask(_ app: Context, _ question: String) async throws -> String {
 }
 ```
 
-## 4. 四个必踩的坑
+## 4. 必踩的坑（①已根治）
 
-### ① `import Swiftus` 会遮蔽 `_Concurrency.Task`
+### ① ~~`import Swiftus` 会遮蔽 `_Concurrency.Task`~~（已根治）
 
-`SwiftusTasks` 定义了公开值类型 `Task`（任务中心的任务），伞产品 `@_exported import` 它之后，**消费方代码里的裸 `Task { }` 会解析到它并编不过**（报 `cannot convert value of type '_' to expected argument type 'JSONValue'` 这类看不懂的错）。
-
-两种解法，任选：
+早期 `SwiftusTasks` 的任务值类型名为 `Task`，伞产品 `@_exported import` 之后**消费方代码里的裸 `Task { }` 会解析到它并编不过**（报 `cannot convert value of type '_' to expected argument type 'JSONValue'` 这类看不懂的错）。2026-10-10 起该类型已改名 **`SwiftusTask`**（规格 S17 §7），裸 `Task { }` 直接可用，无需任何规避：
 
 ```swift
-// 写法 A：显式写全并发版本（用伞产品时必须这样）
-_Concurrency.Task { … }
+import Swiftus
 
-// 写法 B：只 import 具体模块，避开 SwiftusTasks
-import SwiftusCore
-import SwiftusFoundation
-import SwiftusLLM
-import SwiftusCredentials
-Task { … }            // 正常
+Task { … }                       // 并发 Task，正常
+let t: SwiftusTask = …           // 任务中心的任务（若用到）
 ```
 
 ### ② 所有 API 都是 `@ContextTreeActor` 隔离的
@@ -133,7 +126,7 @@ final class ChatViewModel: ObservableObject {
     private var runtime: IosRuntime?
 
     func start() {
-        _Concurrency.Task { [weak self] in
+        Task { [weak self] in
             let made = try? await IosRuntime()   // 跨 actor 调构造
             self?.attach(made)                    // 闭包已继承 MainActor，无需再 hop
         }
@@ -141,7 +134,7 @@ final class ChatViewModel: ObservableObject {
 
     func send(_ q: String) {
         guard let runtime else { return }
-        _Concurrency.Task { [weak self] in
+        Task { [weak self] in
             let reply = try? await runtime.ask(q)
             self?.answer = reply ?? "（请求失败）"
         }
